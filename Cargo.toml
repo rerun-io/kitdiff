@@ -1,32 +1,76 @@
-[workspace]
-resolver = "2"
-members = [
-    "crates/kitdiff",
-]
-
-[workspace.package]
-authors = ["rerun.io <opensource@rerun.io>"]
+[package]
+name = "kitdiff"
+version = "0.1.0"
+authors = ["Lucas Meurer <hi@lucasmerlin.me>"]
 edition = "2024"
 homepage = "https://github.com/rerun-io/kitdiff"
+rust-version = "1.85"
+categories = ["gui", "development-tools", "multimedia::images", "graphics"]
+description = "A visual diffing tool"
 include = ["LICENSE-APACHE", "LICENSE-MIT", "**/*.rs", "Cargo.toml"]
 keywords = ["gui", "tool", "image", "diff"]
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/rerun-io/kitdiff"
-rust-version = "1.86"
+publish = true
+readme = "README.md"
+
+[package.metadata.docs.rs]
+all-features = true
+targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
 
 
-[workspace.dependencies]
+[dependencies]
+eframe = { version = "0.32.3", features = ["glow", "default", "persistence", "ron"] }
+egui_extras = { version = "0.32.3", features = ["image", "file", "http"] }
+ehttp = { version = "0.5", features = ["native-async"] }
+dify = "0.7"
+serde = "1"
+serde_json = "1.0"
+image = "0.25.8"
+tempfile = { version = "3.0" }
+zip = { version = "5", default-features = false, features = ["deflate"] }
+flate2 = { version = "1.1" }
+tar = { version = "0.4" }
 
+
+# native:
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+env_logger = "0.11.8"
+ignore = { version = "0.4" }
+clap = { version = "4.0", features = ["derive"] }
+git2 = { version = "0.18" }
+
+# web:
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = { version = "0.4" }
+wasm-bindgen = { version = "0.2" }
+js-sys = { version = "0.3" }
+web-sys = { version = "0.3", features = ["Window", "Location", "History", "Navigator", "Clipboard", "Performance"] }
+
+[profile.release]
+opt-level = 2 # fast and small wasm
+
+# Optimize all dependencies even in debug builds:
+[profile.dev.package."*"]
+opt-level = 2
 
 
 [patch.crates-io]
 
+# If you want to use the bleeding edge version of egui and eframe:
 egui = { git = "https://github.com/emilk/egui", branch = "lucas/experiments/kitdiff" }
 eframe = { git = "https://github.com/emilk/egui", branch = "lucas/experiments/kitdiff" }
 egui_extras = { git = "https://github.com/emilk/egui", branch = "lucas/experiments/kitdiff" }
 
+# If you fork https://github.com/emilk/egui you can test with:
+# egui = { path = "../egui/crates/egui" }
+# eframe = { path = "../egui/crates/eframe" }
+
+
+
 # ----------------------------------------------------------------------------------------
 # Lints:
+
+[lints]
+workspace = true
 
 [workspace.lints.rust]
 unsafe_code = "deny"
@@ -46,12 +90,14 @@ unused_lifetimes = "warn"
 trivial_casts = "allow"
 unused_qualifications = "allow"
 
+
 [workspace.lints.rustdoc]
 all = "warn"
 missing_crate_level_docs = "warn"
 
-# See also clippy.toml
+
 [workspace.lints.clippy]
+allow_attributes = "warn"
 as_ptr_cast_mut = "warn"
 await_holding_lock = "warn"
 bool_to_int_with_if = "warn"
@@ -132,7 +178,6 @@ mem_forget = "warn"
 mismatching_type_param_order = "warn"
 missing_assert_message = "warn"
 missing_enforced_import_renames = "warn"
-missing_errors_doc = "warn"
 missing_safety_doc = "warn"
 mixed_attributes_style = "warn"
 mut_mut = "warn"
@@ -205,4 +250,3 @@ zero_sized_map_values = "warn"
 
 manual_range_contains = "allow"       # this is better on 'allow'
 map_unwrap_or = "allow"               # this is better on 'allow'
-ref_patterns = "allow"                # It's nice to avoid ref pattern, but there are some situations that are hard (impossible?) to express without.

@@ -3,4 +3,4 @@
 # run:      typos
 
 [default.extend-words]
-teh = "teh"     # part of @teh-cmc
+egui = "egui" # Example for how to ignore a false positive

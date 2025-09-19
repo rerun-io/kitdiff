@@ -152,7 +152,7 @@ impl DiffSource {
                     // For now, try without token (works for public repos)
                     let data = PathOrBlob::Url(
                         api_url,
-                        auth.logged_in.as_ref().map(|l| l.provider_token.clone()),
+                        auth.map(|l| l.provider_token.clone()),
                     );
 
                     // Use async zip loading since it's a URL

@@ -406,7 +406,7 @@ impl eframe::App for App {
                         self.index = 0;
                         self.is_loading = true;
 
-                        source.load(self.sender.clone(), ctx.clone(), &self.settings.auth);
+                        source.load(self.sender.clone(), ctx.clone(), self.settings.auth());
                     } else {
                         // Show error for invalid URL
                         eprintln!("Invalid GitHub artifact URL");
