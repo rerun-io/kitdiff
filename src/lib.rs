@@ -12,6 +12,7 @@ pub mod loaders;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod native_loaders;
 pub mod snapshot;
+pub mod github_pr;
 
 #[derive(Debug, Clone)]
 pub enum DiffSource {
@@ -19,7 +20,6 @@ pub enum DiffSource {
     Files,
     #[cfg(not(target_arch = "wasm32"))]
     Git,
-    #[cfg(not(target_arch = "wasm32"))]
     Pr(String), // Store the PR URL
     Zip(PathOrBlob),   // Store the zip source (URL or file path)
     TarGz(PathOrBlob), // Tar.gz files loaded via drag and drop
@@ -44,10 +44,16 @@ impl DiffSource {
                     .expect("Failed to run git discovery");
                 None
             }
-            #[cfg(not(target_arch = "wasm32"))]
             DiffSource::Pr(url) => {
-                native_loaders::git_loader::pr_git_discovery(url, tx, ctx)
-                    .expect("Failed to run PR git discovery");
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    native_loaders::git_loader::pr_git_discovery(url, tx, ctx)
+                        .expect("Failed to run PR git discovery");
+                }
+                #[cfg(target_arch = "wasm32")]
+                {
+                    eprintln!("PR git discovery not supported on WASM. Use GitHub artifacts instead.");
+                }
                 None
             }
             DiffSource::Zip(data) => {
