@@ -20,9 +20,15 @@ where
     wasm_bindgen_futures::spawn_local(future);
 }
 
-/// Async HTTP request helper
-pub async fn fetch_json(url: String) -> Result<serde_json::Value, String> {
-    let request = ehttp::Request::get(url);
+/// Async HTTP request helper with optional authentication
+pub async fn fetch_json(url: String, auth_token: Option<&str>) -> Result<serde_json::Value, String> {
+    let mut request = ehttp::Request::get(url);
+
+    // Add Authorization header if token is provided
+    if let Some(token) = auth_token {
+        request.headers.insert("Authorization".to_string(), format!("Bearer {}", token));
+        request.headers.insert("User-Agent".to_string(), "kitdiff/1.0".to_string());
+    }
 
     match ehttp::fetch_async(request).await {
         Ok(response) if response.ok => {
@@ -101,12 +107,13 @@ pub struct GithubPr {
     pub commits: Vec<CommitInfo>,
     pub loading: bool,
     pub error_message: Option<String>,
+    pub auth_token: Option<String>,
     rx: mpsc::Receiver<GithubPrMessage>,
     tx: mpsc::Sender<GithubPrMessage>,
 }
 
 impl GithubPr {
-    pub fn new(user: String, repo: String, pr_number: u32, ctx: Context) -> Self {
+    pub fn new(user: String, repo: String, pr_number: u32, ctx: Context, auth_token: Option<String>) -> Self {
         let (tx, rx) = mpsc::channel();
 
         let pr = Self {
@@ -117,13 +124,14 @@ impl GithubPr {
             commits: Vec::new(),
             loading: true,
             error_message: None,
+            auth_token: auth_token.clone(),
             rx,
             tx,
         };
 
         // Start fetching PR details
         let pr_clone = pr.clone_channels();
-        spawn_async(fetch_pr_data_async(user.clone(), repo.clone(), pr_number, pr_clone, ctx));
+        spawn_async(fetch_pr_data_async(user.clone(), repo.clone(), pr_number, pr_clone, ctx, auth_token));
 
         pr
     }
@@ -238,11 +246,12 @@ async fn fetch_pr_data_async(
     pr_number: u32,
     tx: mpsc::Sender<GithubPrMessage>,
     ctx: Context,
+    auth_token: Option<String>,
 ) {
     // First fetch PR details
     let pr_url = format!("https://api.github.com/repos/{}/{}/pulls/{}", user, repo, pr_number);
 
-    match fetch_json(pr_url).await {
+    match fetch_json(pr_url, auth_token.as_deref()).await {
         Ok(json) => {
             let details = PrDetails {
                 title: json["title"].as_str().unwrap_or("Unknown").to_string(),
@@ -254,14 +263,14 @@ async fn fetch_pr_data_async(
             let _ = tx.send(GithubPrMessage::FetchedDetails(details));
 
             // Now fetch commits
-            match fetch_commits_async(&user, &repo, pr_number).await {
+            match fetch_commits_async(&user, &repo, pr_number, auth_token.as_deref()).await {
                 Ok(mut commits) => {
                     println!("Found {} commits for PR {}", commits.len(), pr_number);
 
                     // Fetch artifacts for each commit
                     for commit in &mut commits {
                         println!("Processing commit: {} by {}", &commit.sha[..8], commit.author);
-                        match fetch_artifacts_for_commit(&user, &repo, &commit.sha).await {
+                        match fetch_artifacts_for_commit(&user, &repo, &commit.sha, auth_token.as_deref()).await {
                             Ok(artifacts) => {
                                 commit.artifacts = artifacts;
                                 println!("  Assigned {} artifacts to commit {}", commit.artifacts.len(), &commit.sha[..8]);
@@ -287,10 +296,10 @@ async fn fetch_pr_data_async(
 }
 
 /// Fetch commits for a PR
-async fn fetch_commits_async(user: &str, repo: &str, pr_number: u32) -> Result<Vec<CommitInfo>, String> {
+async fn fetch_commits_async(user: &str, repo: &str, pr_number: u32, auth_token: Option<&str>) -> Result<Vec<CommitInfo>, String> {
     let commits_url = format!("https://api.github.com/repos/{}/{}/pulls/{}/commits", user, repo, pr_number);
 
-    let commits_json = fetch_json(commits_url).await?;
+    let commits_json = fetch_json(commits_url, auth_token).await?;
     let mut commits = Vec::new();
 
     if let Some(commits_array) = commits_json.as_array() {
@@ -334,12 +343,12 @@ async fn fetch_commits_async(user: &str, repo: &str, pr_number: u32) -> Result<V
 }
 
 /// Fetch artifacts for a specific commit
-async fn fetch_artifacts_for_commit(user: &str, repo: &str, commit_sha: &str) -> Result<Vec<GithubArtifact>, String> {
+async fn fetch_artifacts_for_commit(user: &str, repo: &str, commit_sha: &str, auth_token: Option<&str>) -> Result<Vec<GithubArtifact>, String> {
     let runs_url = format!("https://api.github.com/repos/{}/{}/actions/runs?head_sha={}", user, repo, commit_sha);
 
     println!("Fetching runs for commit {}: {}", &commit_sha[..8], runs_url);
 
-    let runs_json = fetch_json(runs_url).await?;
+    let runs_json = fetch_json(runs_url, auth_token).await?;
     let mut all_artifacts = Vec::new();
 
     if let Some(workflow_runs) = runs_json["workflow_runs"].as_array() {
@@ -356,7 +365,7 @@ async fn fetch_artifacts_for_commit(user: &str, repo: &str, commit_sha: &str) ->
 
             // Try to fetch artifacts for completed runs (regardless of success/failure)
             if run_status == "completed" {
-                match fetch_run_artifacts_async(user, repo, run_id).await {
+                match fetch_run_artifacts_async(user, repo, run_id, auth_token).await {
                     Ok(artifacts) => {
                         println!("    Found {} artifacts for run {}", artifacts.len(), run_id);
                         all_artifacts.extend(artifacts);
@@ -376,12 +385,12 @@ async fn fetch_artifacts_for_commit(user: &str, repo: &str, commit_sha: &str) ->
 }
 
 /// Fetch artifacts for a specific workflow run
-async fn fetch_run_artifacts_async(user: &str, repo: &str, run_id: u64) -> Result<Vec<GithubArtifact>, String> {
+async fn fetch_run_artifacts_async(user: &str, repo: &str, run_id: u64, auth_token: Option<&str>) -> Result<Vec<GithubArtifact>, String> {
     let artifacts_url = format!("https://api.github.com/repos/{}/{}/actions/runs/{}/artifacts", user, repo, run_id);
 
     println!("    Fetching artifacts: {}", artifacts_url);
 
-    let json = fetch_json(artifacts_url).await?;
+    let json = fetch_json(artifacts_url, auth_token).await?;
     let mut artifacts = Vec::new();
 
     if let Some(artifacts_array) = json["artifacts"].as_array() {

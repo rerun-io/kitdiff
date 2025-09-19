@@ -101,8 +101,9 @@ impl App {
             match source {
                 // TODO: This kinda sucks, maybe sources should just have an UI?
                 DiffSource::Pr(pr) => {
-                    if let Some((user, repo, pr_number)) = parse_github_pr_url(&pr).ok() {
-                        github_pr = Some(GithubPr::new(user, repo, pr_number, ctx.clone()));
+                    if let Ok((user, repo, pr_number)) = parse_github_pr_url(&pr) {
+                        let auth_token = settings.auth().map(|auth| auth.provider_token.clone());
+                        github_pr = Some(GithubPr::new(user, repo, pr_number, ctx.clone(), auth_token));
                     } else {
                         eprintln!("Invalid GitHub PR URL");
                     }
@@ -454,8 +455,9 @@ impl eframe::App for App {
                         if let Ok((user, repo, pr_number)) =
                             parse_github_pr_url(&self.github_pr_url_input)
                         {
+                            let auth_token = self.settings.auth().map(|auth| auth.provider_token.clone());
                             self.github_pr =
-                                Some(GithubPr::new(user, repo, pr_number, ctx.clone()));
+                                Some(GithubPr::new(user, repo, pr_number, ctx.clone(), auth_token));
                         } else {
                             eprintln!("Invalid GitHub PR URL");
                         }
