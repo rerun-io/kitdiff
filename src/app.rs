@@ -95,8 +95,22 @@ impl App {
         #[cfg(target_arch = "wasm32")]
         let github_auth = GitHubAuth::new(settings.auth.clone());
 
+        let mut github_pr = None;
+
         if let Some(source) = source {
-            source.load(sender.clone(), ctx, settings.auth());
+            match source {
+                // TODO: This kinda sucks, maybe sources should just have an UI?
+                DiffSource::Pr(pr) => {
+                    if let Some((user, repo, pr_number)) = parse_github_pr_url(&pr).ok() {
+                        github_pr = Some(GithubPr::new(user, repo, pr_number, ctx.clone()));
+                    } else {
+                        eprintln!("Invalid GitHub PR URL");
+                    }
+                }
+                source => {
+                    source.load(sender.clone(), ctx, settings.auth());
+                }
+            }
         }
 
         Self {
@@ -113,7 +127,7 @@ impl App {
             #[cfg(target_arch = "wasm32")]
             github_url_input: String::new(),
             github_pr_url_input: String::new(),
-            github_pr: None,
+            github_pr,
             settings,
         }
     }
@@ -437,14 +451,19 @@ impl eframe::App for App {
 
                 ui.horizontal(|ui| {
                     if ui.button("Load PR").clicked() && !self.github_pr_url_input.is_empty() {
-                        if let Ok((user, repo, pr_number)) = parse_github_pr_url(&self.github_pr_url_input) {
-                            self.github_pr = Some(GithubPr::new(user, repo, pr_number, ctx.clone()));
+                        if let Ok((user, repo, pr_number)) =
+                            parse_github_pr_url(&self.github_pr_url_input)
+                        {
+                            self.github_pr =
+                                Some(GithubPr::new(user, repo, pr_number, ctx.clone()));
                         } else {
                             eprintln!("Invalid GitHub PR URL");
                         }
                     }
 
-                    if ui.button("Compare Branches Directly").clicked() && !self.github_pr_url_input.is_empty() {
+                    if ui.button("Compare Branches Directly").clicked()
+                        && !self.github_pr_url_input.is_empty()
+                    {
                         let source = DiffSource::Pr(self.github_pr_url_input.clone());
 
                         // Clear existing snapshots
@@ -474,7 +493,11 @@ impl eframe::App for App {
                         self.index = 0;
                         self.is_loading = true;
 
-                        selected_source.load(self.sender.clone(), ctx.clone(), self.settings.auth());
+                        selected_source.load(
+                            self.sender.clone(),
+                            ctx.clone(),
+                            self.settings.auth(),
+                        );
                     }
                 }
             });
