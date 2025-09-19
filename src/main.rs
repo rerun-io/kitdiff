@@ -26,6 +26,7 @@ fn main() -> eframe::Result<()> {
 #[cfg(target_arch = "wasm32")]
 fn parse_url_query_params() -> Option<DiffSource> {
     use kitdiff::github_auth::parse_github_artifact_url;
+    use kitdiff::github_pr::parse_github_pr_url;
 
     if let Some(window) = web_sys::window() {
         if let Ok(search) = window.location().search() {
@@ -39,6 +40,11 @@ fn parse_url_query_params() -> Option<DiffSource> {
                         let decoded_url = js_sys::decode_uri_component(value)
                             .ok()?
                             .as_string()?;
+
+                        // Try to parse as GitHub PR URL
+                        if let Ok((_user, _repo, _pr_number)) = parse_github_pr_url(&decoded_url) {
+                            return Some(DiffSource::Pr(decoded_url));
+                        }
 
                         // Try to parse as GitHub artifact URL
                         if let Some((owner, repo, artifact_id)) = parse_github_artifact_url(&decoded_url) {
