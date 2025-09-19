@@ -12,7 +12,7 @@ include = ["LICENSE-APACHE", "LICENSE-MIT", "**/*.rs", "Cargo.toml"]
 keywords = ["gui", "tool", "image", "diff"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/rerun-io/kitdiff"
-rust-version = "1.85"
+rust-version = "1.86"
 
 
 [workspace.dependencies]
@@ -20,6 +20,10 @@ rust-version = "1.85"
 
 
 [patch.crates-io]
+
+egui = { git = "https://github.com/emilk/egui", branch = "lucas/experiments/kitdiff" }
+eframe = { git = "https://github.com/emilk/egui", branch = "lucas/experiments/kitdiff" }
+egui_extras = { git = "https://github.com/emilk/egui", branch = "lucas/experiments/kitdiff" }
 
 # ----------------------------------------------------------------------------------------
 # Lints:

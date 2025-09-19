@@ -1,5 +1,5 @@
 use crate::diff_image_loader::{DiffLoader, DiffOptions};
-use crate::github_auth::AuthState;
+use crate::github_auth::{AuthState, LoggedInState};
 #[cfg(target_arch = "wasm32")]
 use crate::github_auth::{GitHubAuth, github_artifact_api_url, parse_github_artifact_url};
 use crate::snapshot::{FileReference, Snapshot};
@@ -29,6 +29,19 @@ struct Settings {
     options: DiffOptions,
     #[cfg(target_arch = "wasm32")]
     auth: AuthState,
+}
+
+impl Settings {
+    fn auth(&self) -> Option<&LoggedInState> {
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.auth.logged_in.as_ref()
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            None
+        }
+    }
 }
 
 impl Default for Settings {
@@ -80,7 +93,7 @@ impl App {
         let github_auth = GitHubAuth::new(settings.auth.clone());
 
         if let Some(source) = source {
-            source.load(sender.clone(), ctx, &settings.auth);
+            source.load(sender.clone(), ctx, settings.auth());
         }
 
         Self {
@@ -164,7 +177,7 @@ impl eframe::App for App {
                     self.index = 0;
                     self.is_loading = true;
 
-                    source.load(self.sender.clone(), ctx.clone(), &self.settings.auth);
+                    source.load(self.sender.clone(), ctx.clone(), self.settings.auth());
                 }
             }
 

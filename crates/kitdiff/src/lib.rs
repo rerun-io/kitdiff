@@ -1,4 +1,4 @@
-use crate::github_auth::AuthState;
+use crate::github_auth::{AuthState, LoggedInState};
 use crate::snapshot::Snapshot;
 use eframe::egui::Context;
 use eframe::egui::load::Bytes;
@@ -31,7 +31,7 @@ pub enum DiffSource {
 }
 
 impl DiffSource {
-    pub fn load(self, tx: Sender<Snapshot>, ctx: Context, auth: &AuthState) -> Option<DropMeLater> {
+    pub fn load(self, tx: Sender<Snapshot>, ctx: Context, auth: Option<&LoggedInState>) -> Option<DropMeLater> {
         match self {
             #[cfg(not(target_arch = "wasm32"))]
             DiffSource::Files => {

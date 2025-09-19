@@ -1,6 +1,6 @@
 # kitdiff, a visual diffing tool
 
-I got frustrated with the experience of reviewing image snapshot changes in my ide and on github, so I made something really cool:
+I got frustrated with the experience of reviewing image snapshot changes (from egui_kittest, thus the name) in my ide and on github, so I made something really cool:
 
 Just run `kitdiff` in your terminal and it'll visualize all the diffs! You can use the `1, 2, 3` keys to switch between `original, new, diff` images. You can also generate diffs on the fly to play with different threshold options. Also, it's wicked quick!
 
