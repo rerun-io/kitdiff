@@ -2,6 +2,25 @@ use std::sync::mpsc;
 use crate::DiffSource;
 use eframe::egui::Context;
 use std::future::Future;
+use serde::Deserialize;
+
+// Import octocrab models
+use octocrab::models::{
+    pulls::PullRequest,
+    repos::RepoCommit,
+    workflows::{Run, WorkflowListArtifact},
+};
+
+// Response wrappers for paginated GitHub API responses
+#[derive(Debug, Clone, Deserialize)]
+pub struct WorkflowRunsResponse {
+    pub workflow_runs: Vec<Run>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ArtifactsResponse {
+    pub artifacts: Vec<WorkflowListArtifact>,
+}
 
 /// Cross-platform async spawn helper
 #[cfg(not(target_arch = "wasm32"))]
@@ -21,7 +40,10 @@ where
 }
 
 /// Async HTTP request helper with optional authentication
-pub async fn fetch_json(url: String, auth_token: Option<&str>) -> Result<serde_json::Value, String> {
+pub async fn fetch_json<T>(url: String, auth_token: Option<&str>) -> Result<T, String>
+where
+    T: for<'de> Deserialize<'de>,
+{
     let mut request = ehttp::Request::get(url);
 
     // Add Authorization header if token is provided
@@ -65,6 +87,7 @@ pub fn parse_github_pr_url(url: &str) -> Result<(String, String, u32), String> {
 
     Ok((user, repo, pr_number))
 }
+
 
 #[derive(Debug, Clone)]
 pub enum GithubPrMessage {
@@ -251,14 +274,14 @@ async fn fetch_pr_data_async(
     // First fetch PR details
     let pr_url = format!("https://api.github.com/repos/{}/{}/pulls/{}", user, repo, pr_number);
 
-    match fetch_json(pr_url, auth_token.as_deref()).await {
-        Ok(json) => {
+    match fetch_json::<PullRequest>(pr_url, auth_token.as_deref()).await {
+        Ok(pr_response) => {
             let details = PrDetails {
-                title: json["title"].as_str().unwrap_or("Unknown").to_string(),
-                head_ref: json["head"]["ref"].as_str().unwrap_or("unknown").to_string(),
-                base_ref: json["base"]["ref"].as_str().unwrap_or("unknown").to_string(),
-                state: json["state"].as_str().unwrap_or("unknown").to_string(),
-                html_url: json["html_url"].as_str().unwrap_or("").to_string(),
+                title: pr_response.title.unwrap_or_else(|| "Unknown".to_string()),
+                head_ref: pr_response.head.ref_field,
+                base_ref: pr_response.base.ref_field,
+                state: pr_response.state.map(|s| format!("{:?}", s)).unwrap_or_else(|| "Unknown".to_string()),
+                html_url: pr_response.html_url.map(|u| u.to_string()).unwrap_or_default(),
             };
             let _ = tx.send(GithubPrMessage::FetchedDetails(details));
 
@@ -299,44 +322,44 @@ async fn fetch_pr_data_async(
 async fn fetch_commits_async(user: &str, repo: &str, pr_number: u32, auth_token: Option<&str>) -> Result<Vec<CommitInfo>, String> {
     let commits_url = format!("https://api.github.com/repos/{}/{}/pulls/{}/commits", user, repo, pr_number);
 
-    let commits_json = fetch_json(commits_url, auth_token).await?;
+    let commits_response = fetch_json::<Vec<RepoCommit>>(commits_url, auth_token).await?;
     let mut commits = Vec::new();
 
-    if let Some(commits_array) = commits_json.as_array() {
-        // Take the last 10 commits (most recent)
-        for commit in commits_array.iter().rev().take(10) {
-            let sha = commit["sha"].as_str().unwrap_or("").to_string();
-            let message = commit["commit"]["message"]
-                .as_str()
-                .unwrap_or("No message")
-                .lines()
-                .next()
-                .unwrap_or("No message")
-                .to_string();
-            let author = commit["commit"]["author"]["name"]
-                .as_str()
-                .unwrap_or("Unknown")
-                .to_string();
-            let date = commit["commit"]["author"]["date"]
-                .as_str()
-                .unwrap_or("")
-                .to_string();
+    // Take the last 10 commits (most recent)
+    for commit in commits_response.iter().rev().take(10) {
+        let message = commit.commit.message
+            .lines()
+            .next()
+            .unwrap_or("No message")
+            .to_string();
 
-            // Format the date to be more readable
-            let formatted_date = if let Ok(parsed_date) = chrono::DateTime::parse_from_rfc3339(&date) {
-                parsed_date.format("%m/%d/%Y %H:%M").to_string()
+        // Format the date to be more readable
+        let formatted_date = if let Some(author) = &commit.commit.author {
+            if let Some(date) = &author.date {
+                if let Ok(parsed_date) = chrono::DateTime::parse_from_rfc3339(&date.to_rfc3339()) {
+                    parsed_date.format("%m/%d/%Y %H:%M").to_string()
+                } else {
+                    date.to_rfc3339()
+                }
             } else {
-                date
-            };
+                "Unknown date".to_string()
+            }
+        } else {
+            "Unknown date".to_string()
+        };
 
-            commits.push(CommitInfo {
-                sha: sha.clone(),
-                message,
-                author,
-                date: formatted_date,
-                artifacts: Vec::new(), // Will be populated later
-            });
-        }
+        let author_name = commit.commit.author
+            .as_ref()
+            .map(|a| a.name.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        commits.push(CommitInfo {
+            sha: commit.sha.clone(),
+            message,
+            author: author_name,
+            date: formatted_date,
+            artifacts: Vec::new(), // Will be populated later
+        });
     }
 
     Ok(commits)
@@ -348,36 +371,31 @@ async fn fetch_artifacts_for_commit(user: &str, repo: &str, commit_sha: &str, au
 
     println!("Fetching runs for commit {}: {}", &commit_sha[..8], runs_url);
 
-    let runs_json = fetch_json(runs_url, auth_token).await?;
+    let runs_response = fetch_json::<WorkflowRunsResponse>(runs_url, auth_token).await?;
     let mut all_artifacts = Vec::new();
 
-    if let Some(workflow_runs) = runs_json["workflow_runs"].as_array() {
-        println!("Found {} workflow runs for commit {}", workflow_runs.len(), &commit_sha[..8]);
+    println!("Found {} workflow runs for commit {}", runs_response.workflow_runs.len(), &commit_sha[..8]);
 
-        // Check all workflow runs, not just successful ones
-        for run in workflow_runs.iter().take(5) {
-            let run_id = run["id"].as_u64().unwrap_or(0);
-            let run_status = run["status"].as_str().unwrap_or("unknown");
-            let run_conclusion = run["conclusion"].as_str().unwrap_or("unknown");
-            let run_name = run["name"].as_str().unwrap_or("unknown");
+    // Check all workflow runs, not just successful ones
+    for run in &runs_response.workflow_runs {
+        println!("  Run: {} (ID: {}) - Status: {}, Conclusion: {}",
+                run.name,
+                run.id.into_inner(),
+                run.status,
+                run.conclusion.as_deref().unwrap_or("unknown"));
 
-            println!("  Run: {} (ID: {}) - Status: {}, Conclusion: {}", run_name, run_id, run_status, run_conclusion);
-
-            // Try to fetch artifacts for completed runs (regardless of success/failure)
-            if run_status == "completed" {
-                match fetch_run_artifacts_async(user, repo, run_id, auth_token).await {
-                    Ok(artifacts) => {
-                        println!("    Found {} artifacts for run {}", artifacts.len(), run_id);
-                        all_artifacts.extend(artifacts);
-                    }
-                    Err(e) => {
-                        println!("    Failed to fetch artifacts for run {}: {}", run_id, e);
-                    }
+        // Try to fetch artifacts for completed runs (regardless of success/failure)
+        if run.status == "completed" {
+            match fetch_run_artifacts_async(user, repo, run.id.into_inner(), auth_token).await {
+                Ok(artifacts) => {
+                    println!("    Found {} artifacts for run {}", artifacts.len(), run.id.into_inner());
+                    all_artifacts.extend(artifacts);
+                }
+                Err(e) => {
+                    println!("    Failed to fetch artifacts for run {}: {}", run.id.into_inner(), e);
                 }
             }
         }
-    } else {
-        println!("No workflow_runs array found in response");
     }
 
     println!("Total artifacts found for commit {}: {}", &commit_sha[..8], all_artifacts.len());
@@ -390,30 +408,25 @@ async fn fetch_run_artifacts_async(user: &str, repo: &str, run_id: u64, auth_tok
 
     println!("    Fetching artifacts: {}", artifacts_url);
 
-    let json = fetch_json(artifacts_url, auth_token).await?;
+    let artifacts_response = fetch_json::<ArtifactsResponse>(artifacts_url, auth_token).await?;
     let mut artifacts = Vec::new();
 
-    if let Some(artifacts_array) = json["artifacts"].as_array() {
-        println!("    Raw artifacts array length: {}", artifacts_array.len());
-        for artifact in artifacts_array {
-            let id = artifact["id"].as_u64().unwrap_or(0);
-            let name = artifact["name"].as_str().unwrap_or("Unknown").to_string();
-            let size_in_bytes = artifact["size_in_bytes"].as_u64().unwrap_or(0);
-            let download_url = artifact["archive_download_url"].as_str().unwrap_or("").to_string();
-            let expired = artifact["expired"].as_bool().unwrap_or(false);
+    println!("    Raw artifacts array length: {}", artifacts_response.artifacts.len());
 
-            println!("      Artifact: {} (ID: {}, Size: {} bytes, Expired: {})", name, id, size_in_bytes, expired);
+    for artifact_data in &artifacts_response.artifacts {
+        println!("      Artifact: {} (ID: {}, Size: {} bytes, Expired: {})",
+                artifact_data.name,
+                artifact_data.id,
+                artifact_data.size_in_bytes,
+                artifact_data.expired);
 
-            // Include even expired artifacts for now, so user can see what was available
-            artifacts.push(GithubArtifact {
-                id,
-                name,
-                size_in_bytes,
-                download_url,
-            });
-        }
-    } else {
-        println!("    No artifacts array found in response");
+        // Include even expired artifacts for now, so user can see what was available
+        artifacts.push(GithubArtifact {
+            id: artifact_data.id.into_inner(),
+            name: artifact_data.name.clone(),
+            size_in_bytes: artifact_data.size_in_bytes as u64,
+            download_url: artifact_data.archive_download_url.to_string(),
+        });
     }
 
     Ok(artifacts)
