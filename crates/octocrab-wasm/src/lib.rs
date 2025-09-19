@@ -1,11 +1,15 @@
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
 
+#[cfg(target_arch = "wasm32")]
 pub use wasm::wasm_builder;
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn builder() -> octocrab::OctocrabBuilder {
-    octocrab::OctocrabBuilder::new()
+use octocrab::{DefaultOctocrabBuilderConfig, NoAuth, NoSvc, NotLayerReady};
+#[cfg(not(target_arch = "wasm32"))]
+pub fn builder()
+-> octocrab::OctocrabBuilder<NoSvc, DefaultOctocrabBuilderConfig, NoAuth, NotLayerReady> {
+    octocrab::Octocrab::builder()
 }
 
 #[cfg(target_arch = "wasm32")]

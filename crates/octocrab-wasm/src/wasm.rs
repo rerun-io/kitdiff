@@ -7,12 +7,13 @@ use std::pin::Pin;
 use std::task::Poll;
 use tower::Service;
 
-pub fn wasm_builder() -> octocrab::OctocrabBuilder<WasmClient, NoConfig, NoAuth, LayerReady> {
+pub fn wasm_builder() -> octocrab::OctocrabBuilder<WasmClient, NoConfig, AuthState, LayerReady> {
     let builder = octocrab::OctocrabBuilder::new_empty()
         .with_service(WasmClient(tonic_web_wasm_client::Client::new(
             "https://api.github.com".to_owned(),
         )))
-        .with_executor(Box::new(wasm_bindgen_futures::spawn_local));
+        .with_executor(Box::new(wasm_bindgen_futures::spawn_local))
+        .with_auth(AuthState::None);
 
     builder
 }

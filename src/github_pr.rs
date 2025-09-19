@@ -147,17 +147,18 @@ impl GithubPr {
     ) -> Self {
         let (tx, rx) = mpsc::channel();
 
-        let client = octocrab_wasm::builder()
-            .with_auth(
-                auth_token
-                    .clone()
-                    .map(|token| AuthState::AccessToken {
-                        token: token.into(),
-                    })
-                    .unwrap_or(AuthState::None),
-            )
+        let mut client = octocrab_wasm::builder()
             .build()
             .expect("Failed to build Octocrab client");
+
+        if let Some(token) = &auth_token {
+            client = client
+                .user_access_token(token.to_owned())
+                .expect("Failed to set token");
+        }
+
+        let pulls = client.pulls("rerun-io", "kitdiff");
+        let pr = pulls.get(1);
 
         let pr = Self {
             user: user.clone(),
