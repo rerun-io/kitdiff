@@ -125,7 +125,7 @@ impl GitHubAuth {
         #[cfg(target_arch = "wasm32")]
         {
             if let Some(window) = web_sys::window() {
-                if let Ok(origin) = window.location().origin() {
+                if let Ok(origin) = window.location().href() {
                     let auth_url = format!(
                         "{}/auth/v1/authorize?provider=github&redirect_to={}&scopes=repo",
                         self.supabase_url, origin
