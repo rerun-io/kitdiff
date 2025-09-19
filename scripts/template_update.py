@@ -51,7 +51,7 @@ PYTHON_FILES = {
     ".github/workflows/python.yml",
     ".mypy.ini",
     "main.py",
-    "new_project_name/__init__.py",
+    "kitdiff/__init__.py",
     "pixi.lock",  # Pixi is only C++ & Python - For Rust we only use cargo
     "pixi.toml",  # Pixi is only C++ & Python - For Rust we only use cargo
     "pyproject.toml",
@@ -68,10 +68,10 @@ RUST_FILES = {
     "CHANGELOG.md",  # We only keep a changelog for Rust crates at the moment
     "clippy.toml",
     "Cranky.toml",
-    "crates/new_project_name/Cargo.toml",
-    "crates/new_project_name/src/",
-    "crates/new_project_name/src/lib.rs",
-    "crates/new_project_name/src/main.rs",
+    "crates/kitdiff/Cargo.toml",
+    "crates/kitdiff/src/",
+    "crates/kitdiff/src/lib.rs",
+    "crates/kitdiff/src/main.rs",
     "deny.toml",
     "RELEASES.md",
     "rust-toolchain",

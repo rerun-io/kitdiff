@@ -1,17 +1,17 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/new_project_name",
+    "crates/kitdiff",
 ]
 
 [workspace.package]
 authors = ["rerun.io <opensource@rerun.io>"]
 edition = "2024"
-homepage = "https://github.com/rerun-io/new_repo_name"
+homepage = "https://github.com/rerun-io/kitdiff"
 include = ["LICENSE-APACHE", "LICENSE-MIT", "**/*.rs", "Cargo.toml"]
-keywords = []                                                        # TODO: fill in if you plan on publishing the crate
+keywords = ["gui", "tool", "image", "diff"]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/rerun-io/new_repo_name"
+repository = "https://github.com/rerun-io/kitdiff"
 rust-version = "1.85"
 
 
@@ -63,7 +63,7 @@ disallowed_methods = "warn"                 # See clippy.toml
 disallowed_names = "warn"                   # See clippy.toml
 disallowed_script_idents = "warn"           # See clippy.toml
 disallowed_types = "warn"                   # See clippy.toml
-doc_include_without_cfg  = "warn"
+doc_include_without_cfg = "warn"
 doc_link_with_quotes = "warn"
 doc_markdown = "warn"
 empty_enum = "warn"

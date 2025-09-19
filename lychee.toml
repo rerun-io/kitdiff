@@ -77,6 +77,6 @@ exclude = [
   'https://github.com/rerun-io/rerun/commit/\.*', # Ignore links to our own commits (typically in changelog).
   'https://github.com/rerun-io/rerun/pull/\.*',   # Ignore links to our own pull requests (typically in changelog).
 
-  # Used in rerun_template repo until the user search-replaces `new_repo_name`
-  'https://github.com/rerun-io/new_repo_name',
+  # Used in rerun_template repo until the user search-replaces `kitdiff`
+  'https://github.com/rerun-io/kitdiff',
 ]

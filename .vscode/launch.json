@@ -14,7 +14,7 @@
         },
         // Rust:
         {
-            "name": "Debug 'new_project_name'",
+            "name": "Debug 'kitdiff'",
             "type": "lldb",
             "request": "launch",
             "cargo": {
@@ -22,7 +22,7 @@
                     "build"
                 ],
                 "filter": {
-                    "name": "new_project_name",
+                    "name": "kitdiff",
                     "kind": "bin"
                 }
             },
