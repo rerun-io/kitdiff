@@ -1,9 +1,10 @@
-use std::sync::mpsc;
 use crate::DiffSource;
 use eframe::egui::Context;
-use std::future::Future;
+use octocrab::AuthState;
+use octocrab::auth::Auth;
 use serde::Deserialize;
-
+use std::future::Future;
+use std::sync::mpsc;
 // Import octocrab models
 use octocrab::models::{
     pulls::PullRequest,
@@ -48,21 +49,23 @@ where
 
     // Add Authorization header if token is provided
     if let Some(token) = auth_token {
-        request.headers.insert("Authorization".to_string(), format!("Bearer {}", token));
-        request.headers.insert("User-Agent".to_string(), "kitdiff/1.0".to_string());
+        request
+            .headers
+            .insert("Authorization".to_string(), format!("Bearer {}", token));
+        request
+            .headers
+            .insert("User-Agent".to_string(), "kitdiff/1.0".to_string());
     }
 
     match ehttp::fetch_async(request).await {
         Ok(response) if response.ok => {
-            serde_json::from_slice(&response.bytes)
-                .map_err(|e| format!("JSON parse error: {}", e))
+            serde_json::from_slice(&response.bytes).map_err(|e| format!("JSON parse error: {}", e))
         }
-        Ok(response) => {
-            Err(format!("HTTP {}: {}", response.status, response.status_text))
-        }
-        Err(e) => {
-            Err(format!("Network error: {}", e))
-        }
+        Ok(response) => Err(format!(
+            "HTTP {}: {}",
+            response.status, response.status_text
+        )),
+        Err(e) => Err(format!("Network error: {}", e)),
     }
 }
 
@@ -72,7 +75,8 @@ pub fn parse_github_pr_url(url: &str) -> Result<(String, String, u32), String> {
         return Err("URL must start with https://github.com/".to_string());
     }
 
-    let path = url.strip_prefix("https://github.com/")
+    let path = url
+        .strip_prefix("https://github.com/")
         .ok_or("Invalid GitHub URL")?;
 
     let parts: Vec<&str> = path.split('/').collect();
@@ -82,12 +86,10 @@ pub fn parse_github_pr_url(url: &str) -> Result<(String, String, u32), String> {
 
     let user = parts[0].to_string();
     let repo = parts[1].to_string();
-    let pr_number = parts[3].parse::<u32>()
-        .map_err(|_| "Invalid PR number")?;
+    let pr_number = parts[3].parse::<u32>().map_err(|_| "Invalid PR number")?;
 
     Ok((user, repo, pr_number))
 }
-
 
 #[derive(Debug, Clone)]
 pub enum GithubPrMessage {
@@ -136,8 +138,26 @@ pub struct GithubPr {
 }
 
 impl GithubPr {
-    pub fn new(user: String, repo: String, pr_number: u32, ctx: Context, auth_token: Option<String>) -> Self {
+    pub fn new(
+        user: String,
+        repo: String,
+        pr_number: u32,
+        ctx: Context,
+        auth_token: Option<String>,
+    ) -> Self {
         let (tx, rx) = mpsc::channel();
+
+        let client = octocrab_wasm::builder()
+            .with_auth(
+                auth_token
+                    .clone()
+                    .map(|token| AuthState::AccessToken {
+                        token: token.into(),
+                    })
+                    .unwrap_or(AuthState::None),
+            )
+            .build()
+            .expect("Failed to build Octocrab client");
 
         let pr = Self {
             user: user.clone(),
@@ -154,7 +174,14 @@ impl GithubPr {
 
         // Start fetching PR details
         let pr_clone = pr.clone_channels();
-        spawn_async(fetch_pr_data_async(user.clone(), repo.clone(), pr_number, pr_clone, ctx, auth_token));
+        spawn_async(fetch_pr_data_async(
+            user.clone(),
+            repo.clone(),
+            pr_number,
+            pr_clone,
+            ctx,
+            auth_token,
+        ));
 
         pr
     }
@@ -162,7 +189,6 @@ impl GithubPr {
     fn clone_channels(&self) -> mpsc::Sender<GithubPrMessage> {
         self.tx.clone()
     }
-
 
     fn update(&mut self) {
         // Process messages from background thread
@@ -206,7 +232,10 @@ impl GithubPr {
             if let Some(details) = &self.pr_details {
                 ui.label(format!("Title: {}", details.title));
                 ui.label(format!("State: {}", details.state));
-                ui.label(format!("Base: {} → Head: {}", details.base_ref, details.head_ref));
+                ui.label(format!(
+                    "Base: {} → Head: {}",
+                    details.base_ref, details.head_ref
+                ));
 
                 ui.separator();
 
@@ -272,7 +301,10 @@ async fn fetch_pr_data_async(
     auth_token: Option<String>,
 ) {
     // First fetch PR details
-    let pr_url = format!("https://api.github.com/repos/{}/{}/pulls/{}", user, repo, pr_number);
+    let pr_url = format!(
+        "https://api.github.com/repos/{}/{}/pulls/{}",
+        user, repo, pr_number
+    );
 
     match fetch_json::<PullRequest>(pr_url, auth_token.as_deref()).await {
         Ok(pr_response) => {
@@ -280,38 +312,53 @@ async fn fetch_pr_data_async(
                 title: pr_response.title.unwrap_or_else(|| "Unknown".to_string()),
                 head_ref: pr_response.head.ref_field,
                 base_ref: pr_response.base.ref_field,
-                state: pr_response.state.map(|s| format!("{:?}", s)).unwrap_or_else(|| "Unknown".to_string()),
-                html_url: pr_response.html_url.map(|u| u.to_string()).unwrap_or_default(),
+                state: pr_response
+                    .state
+                    .map(|s| format!("{:?}", s))
+                    .unwrap_or_else(|| "Unknown".to_string()),
+                html_url: pr_response
+                    .html_url
+                    .map(|u| u.to_string())
+                    .unwrap_or_default(),
             };
             let _ = tx.send(GithubPrMessage::FetchedDetails(details));
 
             // Now fetch commits
             match fetch_commits_async(&user, &repo, pr_number, auth_token.as_deref()).await {
                 Ok(mut commits) => {
-                    println!("Found {} commits for PR {}", commits.len(), pr_number);
-
                     // Fetch artifacts for each commit
                     for commit in &mut commits {
-                        println!("Processing commit: {} by {}", &commit.sha[..8], commit.author);
-                        match fetch_artifacts_for_commit(&user, &repo, &commit.sha, auth_token.as_deref()).await {
+                        match fetch_artifacts_for_commit(
+                            &user,
+                            &repo,
+                            &commit.sha,
+                            auth_token.as_deref(),
+                        )
+                        .await
+                        {
                             Ok(artifacts) => {
                                 commit.artifacts = artifacts;
-                                println!("  Assigned {} artifacts to commit {}", commit.artifacts.len(), &commit.sha[..8]);
                             }
-                            Err(e) => {
-                                println!("  Error fetching artifacts for commit {}: {}", &commit.sha[..8], e);
+                            Err(_) => {
+                                // Silently continue if artifacts fetch fails
                             }
                         }
                     }
                     let _ = tx.send(GithubPrMessage::FetchedCommits(commits));
                 }
                 Err(e) => {
-                    let _ = tx.send(GithubPrMessage::Error(format!("Failed to fetch commits: {}", e)));
+                    let _ = tx.send(GithubPrMessage::Error(format!(
+                        "Failed to fetch commits: {}",
+                        e
+                    )));
                 }
             }
         }
         Err(e) => {
-            let _ = tx.send(GithubPrMessage::Error(format!("Failed to fetch PR details: {}", e)));
+            let _ = tx.send(GithubPrMessage::Error(format!(
+                "Failed to fetch PR details: {}",
+                e
+            )));
         }
     }
 
@@ -319,15 +366,25 @@ async fn fetch_pr_data_async(
 }
 
 /// Fetch commits for a PR
-async fn fetch_commits_async(user: &str, repo: &str, pr_number: u32, auth_token: Option<&str>) -> Result<Vec<CommitInfo>, String> {
-    let commits_url = format!("https://api.github.com/repos/{}/{}/pulls/{}/commits", user, repo, pr_number);
+async fn fetch_commits_async(
+    user: &str,
+    repo: &str,
+    pr_number: u32,
+    auth_token: Option<&str>,
+) -> Result<Vec<CommitInfo>, String> {
+    let commits_url = format!(
+        "https://api.github.com/repos/{}/{}/pulls/{}/commits",
+        user, repo, pr_number
+    );
 
     let commits_response = fetch_json::<Vec<RepoCommit>>(commits_url, auth_token).await?;
     let mut commits = Vec::new();
 
     // Take the last 10 commits (most recent)
-    for commit in commits_response.iter().rev().take(10) {
-        let message = commit.commit.message
+    for commit in commits_response.iter().rev() {
+        let message = commit
+            .commit
+            .message
             .lines()
             .next()
             .unwrap_or("No message")
@@ -348,7 +405,9 @@ async fn fetch_commits_async(user: &str, repo: &str, pr_number: u32, auth_token:
             "Unknown date".to_string()
         };
 
-        let author_name = commit.commit.author
+        let author_name = commit
+            .commit
+            .author
             .as_ref()
             .map(|a| a.name.clone())
             .unwrap_or_else(|| "Unknown".to_string());
@@ -366,60 +425,51 @@ async fn fetch_commits_async(user: &str, repo: &str, pr_number: u32, auth_token:
 }
 
 /// Fetch artifacts for a specific commit
-async fn fetch_artifacts_for_commit(user: &str, repo: &str, commit_sha: &str, auth_token: Option<&str>) -> Result<Vec<GithubArtifact>, String> {
-    let runs_url = format!("https://api.github.com/repos/{}/{}/actions/runs?head_sha={}", user, repo, commit_sha);
-
-    println!("Fetching runs for commit {}: {}", &commit_sha[..8], runs_url);
+async fn fetch_artifacts_for_commit(
+    user: &str,
+    repo: &str,
+    commit_sha: &str,
+    auth_token: Option<&str>,
+) -> Result<Vec<GithubArtifact>, String> {
+    let runs_url = format!(
+        "https://api.github.com/repos/{}/{}/actions/runs?head_sha={}",
+        user, repo, commit_sha
+    );
 
     let runs_response = fetch_json::<WorkflowRunsResponse>(runs_url, auth_token).await?;
     let mut all_artifacts = Vec::new();
 
-    println!("Found {} workflow runs for commit {}", runs_response.workflow_runs.len(), &commit_sha[..8]);
-
     // Check all workflow runs, not just successful ones
     for run in &runs_response.workflow_runs {
-        println!("  Run: {} (ID: {}) - Status: {}, Conclusion: {}",
-                run.name,
-                run.id.into_inner(),
-                run.status,
-                run.conclusion.as_deref().unwrap_or("unknown"));
-
         // Try to fetch artifacts for completed runs (regardless of success/failure)
         if run.status == "completed" {
-            match fetch_run_artifacts_async(user, repo, run.id.into_inner(), auth_token).await {
-                Ok(artifacts) => {
-                    println!("    Found {} artifacts for run {}", artifacts.len(), run.id.into_inner());
-                    all_artifacts.extend(artifacts);
-                }
-                Err(e) => {
-                    println!("    Failed to fetch artifacts for run {}: {}", run.id.into_inner(), e);
-                }
+            if let Ok(artifacts) =
+                fetch_run_artifacts_async(user, repo, run.id.into_inner(), auth_token).await
+            {
+                all_artifacts.extend(artifacts);
             }
         }
     }
 
-    println!("Total artifacts found for commit {}: {}", &commit_sha[..8], all_artifacts.len());
     Ok(all_artifacts)
 }
 
 /// Fetch artifacts for a specific workflow run
-async fn fetch_run_artifacts_async(user: &str, repo: &str, run_id: u64, auth_token: Option<&str>) -> Result<Vec<GithubArtifact>, String> {
-    let artifacts_url = format!("https://api.github.com/repos/{}/{}/actions/runs/{}/artifacts", user, repo, run_id);
-
-    println!("    Fetching artifacts: {}", artifacts_url);
+async fn fetch_run_artifacts_async(
+    user: &str,
+    repo: &str,
+    run_id: u64,
+    auth_token: Option<&str>,
+) -> Result<Vec<GithubArtifact>, String> {
+    let artifacts_url = format!(
+        "https://api.github.com/repos/{}/{}/actions/runs/{}/artifacts",
+        user, repo, run_id
+    );
 
     let artifacts_response = fetch_json::<ArtifactsResponse>(artifacts_url, auth_token).await?;
     let mut artifacts = Vec::new();
 
-    println!("    Raw artifacts array length: {}", artifacts_response.artifacts.len());
-
     for artifact_data in &artifacts_response.artifacts {
-        println!("      Artifact: {} (ID: {}, Size: {} bytes, Expired: {})",
-                artifact_data.name,
-                artifact_data.id,
-                artifact_data.size_in_bytes,
-                artifact_data.expired);
-
         // Include even expired artifacts for now, so user can see what was available
         artifacts.push(GithubArtifact {
             id: artifact_data.id.into_inner(),
