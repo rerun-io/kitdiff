@@ -1,5 +1,7 @@
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
+#[cfg(target_arch = "wasm32")]
+mod reqwest_tower_service;
 
 #[cfg(target_arch = "wasm32")]
 pub use wasm::wasm_builder;

@@ -1,73 +1,17 @@
 use crate::DiffSource;
-use eframe::egui::Context;
-use octocrab::AuthState;
-use octocrab::auth::Auth;
-use serde::Deserialize;
-use std::future::Future;
+use eframe::egui;
+use eframe::egui::{Context, Popup};
+use egui_inbox::UiInbox;
+use octocrab::{AuthState, Error, Octocrab};
+use std::collections::HashMap;
 use std::sync::mpsc;
+use std::task::Poll;
 // Import octocrab models
 use octocrab::models::{
     pulls::PullRequest,
     repos::RepoCommit,
     workflows::{Run, WorkflowListArtifact},
 };
-
-// Response wrappers for paginated GitHub API responses
-#[derive(Debug, Clone, Deserialize)]
-pub struct WorkflowRunsResponse {
-    pub workflow_runs: Vec<Run>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ArtifactsResponse {
-    pub artifacts: Vec<WorkflowListArtifact>,
-}
-
-/// Cross-platform async spawn helper
-#[cfg(not(target_arch = "wasm32"))]
-pub fn spawn_async<F>(future: F)
-where
-    F: Future<Output = ()> + Send + 'static,
-{
-    tokio::task::spawn(future);
-}
-
-#[cfg(target_arch = "wasm32")]
-pub fn spawn_async<F>(future: F)
-where
-    F: Future<Output = ()> + 'static,
-{
-    wasm_bindgen_futures::spawn_local(future);
-}
-
-/// Async HTTP request helper with optional authentication
-pub async fn fetch_json<T>(url: String, auth_token: Option<&str>) -> Result<T, String>
-where
-    T: for<'de> Deserialize<'de>,
-{
-    let mut request = ehttp::Request::get(url);
-
-    // Add Authorization header if token is provided
-    if let Some(token) = auth_token {
-        request
-            .headers
-            .insert("Authorization".to_string(), format!("Bearer {}", token));
-        request
-            .headers
-            .insert("User-Agent".to_string(), "kitdiff/1.0".to_string());
-    }
-
-    match ehttp::fetch_async(request).await {
-        Ok(response) if response.ok => {
-            serde_json::from_slice(&response.bytes).map_err(|e| format!("JSON parse error: {}", e))
-        }
-        Ok(response) => Err(format!(
-            "HTTP {}: {}",
-            response.status, response.status_text
-        )),
-        Err(e) => Err(format!("Network error: {}", e)),
-    }
-}
 
 pub fn parse_github_pr_url(url: &str) -> Result<(String, String, u32), String> {
     // Parse URLs like: https://github.com/rerun-io/rerun/pull/11253
@@ -128,13 +72,9 @@ pub struct GithubPr {
     pub user: String,
     pub repo: String,
     pub pr_number: u32,
-    pub pr_details: Option<PrDetails>,
-    pub commits: Vec<CommitInfo>,
-    pub loading: bool,
-    pub error_message: Option<String>,
     pub auth_token: Option<String>,
-    rx: mpsc::Receiver<GithubPrMessage>,
-    tx: mpsc::Sender<GithubPrMessage>,
+    inbox: UiInbox<Result<PrWithArtifacts, octocrab::Error>>,
+    pub data: Poll<Result<PrWithArtifacts, octocrab::Error>>,
 }
 
 impl GithubPr {
@@ -145,8 +85,6 @@ impl GithubPr {
         ctx: Context,
         auth_token: Option<String>,
     ) -> Self {
-        let (tx, rx) = mpsc::channel();
-
         let mut client = octocrab_wasm::builder()
             .build()
             .expect("Failed to build Octocrab client");
@@ -157,133 +95,90 @@ impl GithubPr {
                 .expect("Failed to set token");
         }
 
-        let pulls = client.pulls("rerun-io", "kitdiff");
-        let pr = pulls.get(1);
+        let mut inbox = UiInbox::new();
 
-        let pr = Self {
+        {
+            let client = client.clone();
+            let user = user.clone();
+            let repo = repo.clone();
+            let pr_number = pr_number;
+            inbox.spawn(|tx| async move {
+                let details = get_all_pr_artifacts(&client, &user, &repo, pr_number as u64).await;
+                let _ = tx.send(details);
+            });
+        }
+
+        Self {
             user: user.clone(),
             repo: repo.clone(),
             pr_number,
-            pr_details: None,
-            commits: Vec::new(),
-            loading: true,
-            error_message: None,
             auth_token: auth_token.clone(),
-            rx,
-            tx,
-        };
-
-        // Start fetching PR details
-        let pr_clone = pr.clone_channels();
-        spawn_async(fetch_pr_data_async(
-            user.clone(),
-            repo.clone(),
-            pr_number,
-            pr_clone,
-            ctx,
-            auth_token,
-        ));
-
-        pr
-    }
-
-    fn clone_channels(&self) -> mpsc::Sender<GithubPrMessage> {
-        self.tx.clone()
-    }
-
-    fn update(&mut self) {
-        // Process messages from background thread
-        while let Ok(message) = self.rx.try_recv() {
-            match message {
-                GithubPrMessage::FetchedDetails(details) => {
-                    self.pr_details = Some(details);
-                    self.loading = false;
-                }
-                GithubPrMessage::FetchedCommits(commits) => {
-                    self.commits = commits;
-                }
-                GithubPrMessage::Error(error) => {
-                    self.error_message = Some(error);
-                    self.loading = false;
-                }
-            }
+            inbox,
+            data: Poll::Pending,
         }
     }
 
     /// Display details about the PR and allow selecting an artifact to load
     pub fn ui(&mut self, ui: &mut eframe::egui::Ui) -> Option<DiffSource> {
-        self.update();
+        if let Some(data) = self.inbox.read(ui).last() {
+            self.data = Poll::Ready(data);
+        }
 
         let mut selected_source = None;
 
         ui.group(|ui| {
             ui.heading(format!("GitHub PR #{}", self.pr_number));
 
-            if self.loading {
-                ui.label("Loading PR details...");
-                ui.spinner();
-                return;
-            }
+            match &self.data {
+                Poll::Ready(Ok(data)) => {
+                    let details = &data.pr;
 
-            if let Some(error) = &self.error_message {
-                ui.colored_label(ui.visuals().error_fg_color, format!("Error: {}", error));
-                return;
-            }
+                    if let Some(title) = &details.title {
+                        ui.label(title);
+                    }
 
-            if let Some(details) = &self.pr_details {
-                ui.label(format!("Title: {}", details.title));
-                ui.label(format!("State: {}", details.state));
-                ui.label(format!(
-                    "Base: {} → Head: {}",
-                    details.base_ref, details.head_ref
-                ));
+                    ui.separator();
 
-                ui.separator();
+                    if let Some(html_url) = &details.html_url {
+                        if ui.button("Compare PR Branches").clicked() {
+                            selected_source = Some(DiffSource::Pr(html_url.to_string()));
+                        }
+                    }
 
-                if ui.button("Compare PR Branches").clicked() {
-                    selected_source = Some(DiffSource::Pr(details.html_url.clone()));
-                }
+                    ui.separator();
+                    ui.heading("Recent Commits & Artifacts");
 
-                ui.separator();
-                ui.heading("Recent Commits & Artifacts");
-
-                if self.commits.is_empty() {
-                    ui.label("No commits found for this PR.");
-                } else {
-                    for commit in &self.commits {
-                        ui.group(|ui| {
-                            ui.horizontal(|ui| {
-                                ui.label("📝");
-                                ui.vertical(|ui| {
-                                    ui.strong(&commit.message);
-                                    ui.label(format!("by {} on {}", commit.author, commit.date));
-                                    ui.monospace(format!("SHA: {}", &commit.sha[..8]));
-                                });
-                            });
-
-                            if !commit.artifacts.is_empty() {
-                                ui.separator();
-                                ui.label(format!("Artifacts ({}):", commit.artifacts.len()));
-                                for artifact in &commit.artifacts {
-                                    ui.horizontal(|ui| {
-                                        ui.label("📦");
-                                        ui.label(&artifact.name);
-                                        ui.label(format!("({} KB)", artifact.size_in_bytes / 1024));
-                                        if ui.button("Load").clicked() {
-                                            selected_source = Some(DiffSource::GHArtifact {
-                                                owner: self.user.clone(),
-                                                repo: self.repo.clone(),
-                                                artifact_id: artifact.id.to_string(),
-                                            });
+                    for (commit, artifacts) in &data.artifacts_by_commit {
+                        egui::Sides::new().shrink_left().show(
+                            ui,
+                            |ui| {
+                                ui.label(&commit.commit.message);
+                            },
+                            |ui| {
+                                if artifacts.len() > 0 {
+                                    let response =
+                                        ui.link(format!("{} artifacts", artifacts.len()));
+                                    Popup::menu(&response).show(|ui| {
+                                        for artifact in artifacts {
+                                            if ui.button(&artifact.name).clicked() {
+                                                selected_source = Some(DiffSource::GHArtifact {
+                                                    owner: self.user.clone(),
+                                                    repo: self.repo.clone(),
+                                                    artifact_id: artifact.id.to_string(),
+                                                });
+                                            }
                                         }
                                     });
                                 }
-                            } else {
-                                ui.label("No artifacts available for this commit");
-                            }
-                        });
-                        ui.add_space(5.0);
+                            },
+                        );
                     }
+                }
+                Poll::Ready(Err(error)) => {
+                    ui.colored_label(ui.visuals().error_fg_color, format!("Error: {}", error));
+                }
+                Poll::Pending => {
+                    ui.spinner();
                 }
             }
         });
@@ -292,193 +187,117 @@ impl GithubPr {
     }
 }
 
-/// Main async function to fetch all PR data
-async fn fetch_pr_data_async(
-    user: String,
-    repo: String,
-    pr_number: u32,
-    tx: mpsc::Sender<GithubPrMessage>,
-    ctx: Context,
-    auth_token: Option<String>,
-) {
-    // First fetch PR details
-    let pr_url = format!(
-        "https://api.github.com/repos/{}/{}/pulls/{}",
-        user, repo, pr_number
-    );
+async fn get_pr_runs_by_commit(
+    octocrab: &Octocrab,
+    owner: &str,
+    repo: &str,
+    pr_number: u64,
+) -> octocrab::Result<HashMap<String, Vec<Run>>> {
+    // First, get the PR to find the head branch
+    let pr = octocrab.pulls(owner, repo).get(pr_number).await?;
 
-    match fetch_json::<PullRequest>(pr_url, auth_token.as_deref()).await {
-        Ok(pr_response) => {
-            let details = PrDetails {
-                title: pr_response.title.unwrap_or_else(|| "Unknown".to_string()),
-                head_ref: pr_response.head.ref_field,
-                base_ref: pr_response.base.ref_field,
-                state: pr_response
-                    .state
-                    .map(|s| format!("{:?}", s))
-                    .unwrap_or_else(|| "Unknown".to_string()),
-                html_url: pr_response
-                    .html_url
-                    .map(|u| u.to_string())
-                    .unwrap_or_default(),
-            };
-            let _ = tx.send(GithubPrMessage::FetchedDetails(details));
+    // Get the branch name from the PR
+    let branch_name = &pr.head.ref_field;
 
-            // Now fetch commits
-            match fetch_commits_async(&user, &repo, pr_number, auth_token.as_deref()).await {
-                Ok(mut commits) => {
-                    // Fetch artifacts for each commit
-                    for commit in &mut commits {
-                        match fetch_artifacts_for_commit(
-                            &user,
-                            &repo,
-                            &commit.sha,
-                            auth_token.as_deref(),
-                        )
-                        .await
-                        {
-                            Ok(artifacts) => {
-                                commit.artifacts = artifacts;
-                            }
-                            Err(_) => {
-                                // Silently continue if artifacts fetch fails
-                            }
-                        }
-                    }
-                    let _ = tx.send(GithubPrMessage::FetchedCommits(commits));
-                }
-                Err(e) => {
-                    let _ = tx.send(GithubPrMessage::Error(format!(
-                        "Failed to fetch commits: {}",
-                        e
-                    )));
-                }
-            }
+    // List all workflow runs for this branch
+    let mut runs_by_commit: HashMap<String, Vec<Run>> = HashMap::new();
+    let mut page = 1u32;
+
+    loop {
+        let runs = octocrab
+            .workflows(owner, repo)
+            .list_all_runs()
+            .branch(branch_name)
+            .page(page)
+            .per_page(100)
+            .send()
+            .await?;
+
+        // Group runs by commit SHA
+        for run in runs.items {
+            runs_by_commit
+                .entry(run.head_sha.clone())
+                .or_insert_with(Vec::new)
+                .push(run);
         }
-        Err(e) => {
-            let _ = tx.send(GithubPrMessage::Error(format!(
-                "Failed to fetch PR details: {}",
-                e
-            )));
+
+        // Check if there are more pages
+        if runs.next.is_none() {
+            break;
         }
+        page += 1;
     }
 
-    ctx.request_repaint();
+    Ok(runs_by_commit)
 }
 
-/// Fetch commits for a PR
-async fn fetch_commits_async(
-    user: &str,
-    repo: &str,
-    pr_number: u32,
-    auth_token: Option<&str>,
-) -> Result<Vec<CommitInfo>, String> {
-    let commits_url = format!(
-        "https://api.github.com/repos/{}/{}/pulls/{}/commits",
-        user, repo, pr_number
-    );
-
-    let commits_response = fetch_json::<Vec<RepoCommit>>(commits_url, auth_token).await?;
-    let mut commits = Vec::new();
-
-    // Take the last 10 commits (most recent)
-    for commit in commits_response.iter().rev() {
-        let message = commit
-            .commit
-            .message
-            .lines()
-            .next()
-            .unwrap_or("No message")
-            .to_string();
-
-        // Format the date to be more readable
-        let formatted_date = if let Some(author) = &commit.commit.author {
-            if let Some(date) = &author.date {
-                if let Ok(parsed_date) = chrono::DateTime::parse_from_rfc3339(&date.to_rfc3339()) {
-                    parsed_date.format("%m/%d/%Y %H:%M").to_string()
-                } else {
-                    date.to_rfc3339()
-                }
-            } else {
-                "Unknown date".to_string()
-            }
-        } else {
-            "Unknown date".to_string()
-        };
-
-        let author_name = commit
-            .commit
-            .author
-            .as_ref()
-            .map(|a| a.name.clone())
-            .unwrap_or_else(|| "Unknown".to_string());
-
-        commits.push(CommitInfo {
-            sha: commit.sha.clone(),
-            message,
-            author: author_name,
-            date: formatted_date,
-            artifacts: Vec::new(), // Will be populated later
-        });
-    }
-
-    Ok(commits)
+struct CommitsWithRuns {
+    commits: Vec<(RepoCommit, Vec<Run>)>,
 }
 
-/// Fetch artifacts for a specific commit
-async fn fetch_artifacts_for_commit(
-    user: &str,
+// Get all commits for a PR to get a complete picture
+async fn get_pr_commits_with_runs(
+    octocrab: &Octocrab,
+    owner: &str,
     repo: &str,
-    commit_sha: &str,
-    auth_token: Option<&str>,
-) -> Result<Vec<GithubArtifact>, String> {
-    let runs_url = format!(
-        "https://api.github.com/repos/{}/{}/actions/runs?head_sha={}",
-        user, repo, commit_sha
-    );
+    pr_number: u64,
+) -> octocrab::Result<Vec<(RepoCommit, Vec<Run>)>> {
+    // Get all commits in the PR
+    let commits = octocrab
+        .pulls(owner, repo)
+        .pr_commits(pr_number)
+        .send()
+        .await?;
 
-    let runs_response = fetch_json::<WorkflowRunsResponse>(runs_url, auth_token).await?;
-    let mut all_artifacts = Vec::new();
+    // Get all runs grouped by commit
+    let runs_by_commit = get_pr_runs_by_commit(octocrab, owner, repo, pr_number).await?;
 
-    // Check all workflow runs, not just successful ones
-    for run in &runs_response.workflow_runs {
-        // Try to fetch artifacts for completed runs (regardless of success/failure)
-        if run.status == "completed" {
-            if let Ok(artifacts) =
-                fetch_run_artifacts_async(user, repo, run.id.into_inner(), auth_token).await
-            {
-                all_artifacts.extend(artifacts);
+    Ok(commits
+        .items
+        .into_iter()
+        .map(|commit| {
+            let runs = runs_by_commit
+                .get(&commit.sha)
+                .cloned()
+                .unwrap_or_else(Vec::new);
+            (commit, runs)
+        })
+        .collect())
+}
+
+struct PrWithArtifacts {
+    pr: PullRequest,
+    artifacts_by_commit: Vec<(RepoCommit, Vec<WorkflowListArtifact>)>,
+}
+
+async fn get_all_pr_artifacts(
+    octocrab: &Octocrab,
+    owner: &str,
+    repo: &str,
+    pr_number: u64,
+) -> octocrab::Result<PrWithArtifacts> {
+    let commits_with_runs = get_pr_commits_with_runs(octocrab, owner, repo, pr_number).await?;
+
+    let mut artifacts_by_commit = Vec::new();
+    for (commit, runs) in commits_with_runs {
+        let mut all_artifacts = Vec::new();
+        for run in runs {
+            let artifacts = octocrab
+                .actions()
+                .list_workflow_run_artifacts(owner, repo, run.id.into())
+                .send()
+                .await?;
+            if let Some(artifacts) = artifacts.value {
+                all_artifacts.extend(artifacts.items);
             }
         }
+        artifacts_by_commit.push((commit, all_artifacts));
     }
 
-    Ok(all_artifacts)
-}
+    let pr = octocrab.pulls(owner, repo).get(pr_number).await?;
 
-/// Fetch artifacts for a specific workflow run
-async fn fetch_run_artifacts_async(
-    user: &str,
-    repo: &str,
-    run_id: u64,
-    auth_token: Option<&str>,
-) -> Result<Vec<GithubArtifact>, String> {
-    let artifacts_url = format!(
-        "https://api.github.com/repos/{}/{}/actions/runs/{}/artifacts",
-        user, repo, run_id
-    );
-
-    let artifacts_response = fetch_json::<ArtifactsResponse>(artifacts_url, auth_token).await?;
-    let mut artifacts = Vec::new();
-
-    for artifact_data in &artifacts_response.artifacts {
-        // Include even expired artifacts for now, so user can see what was available
-        artifacts.push(GithubArtifact {
-            id: artifact_data.id.into_inner(),
-            name: artifact_data.name.clone(),
-            size_in_bytes: artifact_data.size_in_bytes as u64,
-            download_url: artifact_data.archive_download_url.to_string(),
-        });
-    }
-
-    Ok(artifacts)
+    Ok(PrWithArtifacts {
+        pr,
+        artifacts_by_commit,
+    })
 }
