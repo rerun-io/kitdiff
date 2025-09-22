@@ -1,2 +1,3 @@
 [build]
 filehash = false
+no_sri = true # Seems to cause problems with eframe
