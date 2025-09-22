@@ -60,7 +60,7 @@ pub fn pr_git_discovery(pr_url: String, sender: mpsc::Sender<Snapshot>, ctx: Con
 
 fn run_git_discovery(sender: mpsc::Sender<Snapshot>, ctx: Context) -> Result<(), GitError> {
     // Open git repository in current directory
-    let repo = Repository::open("../../../../../..").map_err(|_| GitError::RepoNotFound)?;
+    let repo = Repository::open(".").map_err(|_| GitError::RepoNotFound)?;
 
     // Get current branch
     let head = repo.head()?;
