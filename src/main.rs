@@ -37,9 +37,7 @@ fn parse_url_query_params() -> Option<DiffSource> {
                 if let Some((key, value)) = param.split_once('=') {
                     if key == "url" {
                         // URL decode the value
-                        let decoded_url = js_sys::decode_uri_component(value)
-                            .ok()?
-                            .as_string()?;
+                        let decoded_url = js_sys::decode_uri_component(value).ok()?.as_string()?;
 
                         // Try to parse as GitHub PR URL
                         if let Ok((_user, _repo, _pr_number)) = parse_github_pr_url(&decoded_url) {
@@ -47,16 +45,28 @@ fn parse_url_query_params() -> Option<DiffSource> {
                         }
 
                         // Try to parse as GitHub artifact URL
-                        if let Some((owner, repo, artifact_id)) = parse_github_artifact_url(&decoded_url) {
-                            return Some(DiffSource::GHArtifact { owner, repo, artifact_id });
+                        if let Some((owner, repo, artifact_id)) =
+                            parse_github_artifact_url(&decoded_url)
+                        {
+                            return Some(DiffSource::GHArtifact {
+                                owner,
+                                repo,
+                                artifact_id,
+                            });
                         }
 
                         // Try to parse as direct zip/tar.gz URL
                         if decoded_url.ends_with(".zip") {
-                            return Some(DiffSource::Zip(kitdiff::PathOrBlob::Url(decoded_url, None)));
+                            return Some(DiffSource::Zip(kitdiff::PathOrBlob::Url(
+                                decoded_url,
+                                None,
+                            )));
                         }
                         if decoded_url.ends_with(".tar.gz") || decoded_url.ends_with(".tgz") {
-                            return Some(DiffSource::TarGz(kitdiff::PathOrBlob::Url(decoded_url, None)));
+                            return Some(DiffSource::TarGz(kitdiff::PathOrBlob::Url(
+                                decoded_url,
+                                None,
+                            )));
                         }
                     }
                 }

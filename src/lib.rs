@@ -8,11 +8,11 @@ use std::sync::mpsc::Sender;
 pub mod app;
 pub mod diff_image_loader;
 pub mod github_auth;
+pub mod github_pr;
 pub mod loaders;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod native_loaders;
 pub mod snapshot;
-pub mod github_pr;
 
 #[derive(Debug, Clone)]
 pub enum DiffSource {
@@ -20,7 +20,7 @@ pub enum DiffSource {
     Files,
     #[cfg(not(target_arch = "wasm32"))]
     Git,
-    Pr(String), // Store the PR URL
+    Pr(String),        // Store the PR URL
     Zip(PathOrBlob),   // Store the zip source (URL or file path)
     TarGz(PathOrBlob), // Tar.gz files loaded via drag and drop
     GHArtifact {
@@ -31,7 +31,12 @@ pub enum DiffSource {
 }
 
 impl DiffSource {
-    pub fn load(self, tx: Sender<Snapshot>, ctx: Context, auth: Option<&LoggedInState>) -> Option<DropMeLater> {
+    pub fn load(
+        self,
+        tx: Sender<Snapshot>,
+        ctx: Context,
+        auth: Option<&LoggedInState>,
+    ) -> Option<DropMeLater> {
         match self {
             #[cfg(not(target_arch = "wasm32"))]
             DiffSource::Files => {
@@ -52,7 +57,9 @@ impl DiffSource {
                 }
                 #[cfg(target_arch = "wasm32")]
                 {
-                    eprintln!("PR git discovery not supported on WASM. Use GitHub artifacts instead.");
+                    eprintln!(
+                        "PR git discovery not supported on WASM. Use GitHub artifacts instead."
+                    );
                 }
                 None
             }
@@ -156,10 +163,7 @@ impl DiffSource {
 
                     // TODO: Get GitHub token from auth state - we'll need to pass this context
                     // For now, try without token (works for public repos)
-                    let data = PathOrBlob::Url(
-                        api_url,
-                        auth.map(|l| l.provider_token.clone()),
-                    );
+                    let data = PathOrBlob::Url(api_url, auth.map(|l| l.provider_token.clone()));
 
                     // Use async zip loading since it's a URL
                     let tx_clone = tx.clone();

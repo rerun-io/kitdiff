@@ -1,7 +1,7 @@
 use crate::diff_image_loader;
 use crate::diff_image_loader::DiffOptions;
-use std::path::PathBuf;
 use eframe::egui::ImageSource;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct Snapshot {
@@ -29,7 +29,6 @@ impl FileReference {
         }
     }
 }
-
 
 impl Snapshot {
     pub fn old_uri(&self) -> String {

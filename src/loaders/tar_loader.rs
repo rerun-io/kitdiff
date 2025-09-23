@@ -1,3 +1,4 @@
+use crate::snapshot::{FileReference, Snapshot};
 use eframe::egui::{Context, ImageSource};
 use flate2::read::GzDecoder;
 use std::borrow::Cow;
@@ -6,7 +7,6 @@ use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use tar::Archive;
-use crate::snapshot::{FileReference, Snapshot};
 
 #[derive(Debug)]
 pub enum TarError {

@@ -5,11 +5,7 @@ use ignore::types::TypesBuilder;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
-pub fn file_discovery(
-    base_path: impl Into<PathBuf>,
-    sender: mpsc::Sender<Snapshot>,
-    ctx: Context,
-) {
+pub fn file_discovery(base_path: impl Into<PathBuf>, sender: mpsc::Sender<Snapshot>, ctx: Context) {
     let path = base_path.into();
 
     std::thread::spawn(move || {
