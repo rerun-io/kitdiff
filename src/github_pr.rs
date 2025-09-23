@@ -2,8 +2,11 @@ use crate::DiffSource;
 use eframe::egui;
 use eframe::egui::{Context, Popup};
 use egui_inbox::UiInbox;
+use futures::stream::FuturesUnordered;
+use futures::{StreamExt, TryStreamExt};
 use octocrab::{AuthState, Error, Octocrab};
 use std::collections::HashMap;
+use std::future::ready;
 use std::sync::mpsc;
 use std::task::Poll;
 // Import octocrab models
@@ -148,6 +151,8 @@ impl GithubPr {
                     ui.separator();
                     ui.heading("Recent Commits & Artifacts");
 
+                    ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
+
                     for (commit, artifacts) in &data.artifacts_by_commit {
                         egui::Sides::new().shrink_left().show(
                             ui,
@@ -231,10 +236,6 @@ async fn get_pr_runs_by_commit(
     Ok(runs_by_commit)
 }
 
-struct CommitsWithRuns {
-    commits: Vec<(RepoCommit, Vec<Run>)>,
-}
-
 // Get all commits for a PR to get a complete picture
 async fn get_pr_commits_with_runs(
     octocrab: &Octocrab,
@@ -280,18 +281,23 @@ async fn get_all_pr_artifacts(
 
     let mut artifacts_by_commit = Vec::new();
     for (commit, runs) in commits_with_runs {
-        let mut all_artifacts = Vec::new();
-        for run in runs {
-            let artifacts = octocrab
+        let artifacts = FuturesUnordered::from_iter(runs.into_iter().map(|run| async move {
+            octocrab
                 .actions()
                 .list_workflow_run_artifacts(owner, repo, run.id.into())
                 .send()
-                .await?;
-            if let Some(artifacts) = artifacts.value {
-                all_artifacts.extend(artifacts.items);
-            }
-        }
-        artifacts_by_commit.push((commit, all_artifacts));
+                .await
+        }))
+        .try_filter_map(|item| {
+            ready(Ok(item
+                .value
+                .map(|page| futures::stream::iter(page.items).map(Ok))))
+        })
+        .try_flatten()
+        .try_collect::<Vec<WorkflowListArtifact>>()
+        .await?;
+
+        artifacts_by_commit.push((commit, artifacts));
     }
 
     let pr = octocrab.pulls(owner, repo).get(pr_number).await?;

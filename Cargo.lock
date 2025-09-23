@@ -2489,6 +2489,7 @@ dependencies = [
  "ehttp",
  "env_logger",
  "flate2",
+ "futures",
  "git2",
  "ignore",
  "image",
