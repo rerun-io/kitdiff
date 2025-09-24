@@ -53,7 +53,7 @@ impl ViewerState {
 /// If any is true, only show those, but at full opacity
 ///
 /// If all are false, show all at their set opacities
-#[derive(Default, Copy, Clone)]
+#[derive(Default, Copy, Clone, PartialEq)]
 pub struct ViewFilter {
     pub show_old: bool,
     pub show_new: bool,
@@ -194,6 +194,7 @@ pub enum SystemCommand {
 pub enum ViewerSystemCommand {
     SetFilter(String),
     SelectSnapshot(usize),
+    SetViewFilter(ViewFilter),
 }
 
 impl From<ViewerSystemCommand> for SystemCommand {
@@ -206,10 +207,7 @@ impl AppState {
     pub fn handle(&mut self, ctx: &Context, command: SystemCommand) {
         match command {
             SystemCommand::Open(source) => {
-                let loader = source.load(
-                    ctx.clone(),
-                    &self,
-                );
+                let loader = source.load(ctx.clone(), &self);
                 self.page = Page::DiffViewer(ViewerState {
                     filter: String::new(),
                     index: 0,
@@ -219,7 +217,7 @@ impl AppState {
                 });
             }
             SystemCommand::GithubAuth(auth) => {
-                todo!()
+                self.github_auth.handle(auth);
             }
             SystemCommand::LoadPrDetails(url) => {
                 self.github_pr = Some(GithubPr::new(
@@ -246,6 +244,8 @@ impl AppState {
             viewer.loader.update(ctx);
             viewer.index_just_selected = false;
         }
+
+        self.github_auth.update(ctx);
     }
 }
 
@@ -261,6 +261,9 @@ impl ViewerState {
                     self.index = index;
                     self.index_just_selected = true;
                 }
+            }
+            ViewerSystemCommand::SetViewFilter(view_filter) => {
+                self.view_filter = view_filter;
             }
         }
     }

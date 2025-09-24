@@ -4,6 +4,7 @@ use crate::snapshot::Snapshot;
 use eframe::egui::Context;
 use eframe::egui::load::Bytes;
 use std::any::Any;
+use std::path::PathBuf;
 use std::sync::mpsc::Sender;
 use crate::github_model::{GithubPrLink, GithubRepoLink};
 use crate::state::AppState;
@@ -18,15 +19,16 @@ pub mod native_loaders;
 mod settings;
 pub mod snapshot;
 mod state;
-mod github_model;
+pub mod github_model;
 mod octokit;
 mod viewer;
 mod home;
+mod bar;
 
 #[derive(Debug, Clone)]
 pub enum DiffSource {
     #[cfg(not(target_arch = "wasm32"))]
-    Files,
+    Files(PathBuf),
     #[cfg(not(target_arch = "wasm32"))]
     Git,
     Pr(GithubPrLink),
@@ -46,8 +48,8 @@ impl DiffSource {
     ) -> SnapshotLoader {
         match self {
             #[cfg(not(target_arch = "wasm32"))]
-            DiffSource::Files => {
-                Box::new(native_loaders::file_loader::FileLoader::new("."))
+            DiffSource::Files(path) => {
+                Box::new(native_loaders::file_loader::FileLoader::new(path))
             }
             // #[cfg(not(target_arch = "wasm32"))]
             // DiffSource::Git => {

@@ -44,8 +44,6 @@ pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
 
         let any_loading = is_loading(&old) || is_loading(&new) || is_loading(&diff);
 
-        dbg!(&old, &new);
-
         if let Some(old) = old {
             ui.place(rect, old);
         }

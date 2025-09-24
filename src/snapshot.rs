@@ -87,9 +87,9 @@ impl Snapshot {
                 ..eframe::egui::TextureOptions::default()
             })
             .tint(Color32::from_white_alpha(if show_all {
-                u8::MAX
-            } else {
                 (255.0 * opacity) as u8
+            } else {
+                u8::MAX
             }));
 
         match state.settings.mode {
@@ -110,7 +110,7 @@ impl Snapshot {
         (show_all || show_old)
             .then(|| self.old_uri())
             .flatten()
-            .map(|uri| self.make_image(state, uri, state.settings.new_opacity, show_all))
+            .map(|uri| self.make_image(state, uri, 1.0, show_all))
     }
 
     pub fn new_image(&self, state: &AppStateRef<'_>) -> Option<eframe::egui::Image> {

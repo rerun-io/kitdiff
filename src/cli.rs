@@ -13,7 +13,9 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// Compare snapshot test files (.png with .old/.new/.diff variants) (default)
-    Files,
+    Files {
+        directory: Option<String>,
+    },
     /// Compare images between current branch and default branch
     Git,
     /// Compare images between PR branches from GitHub PR URL (needs to be run from within the repo)
@@ -27,7 +29,9 @@ pub enum Commands {
 impl Commands {
     pub fn to_source(&self) -> DiffSource {
         match self {
-            Commands::Files => DiffSource::Files,
+            Commands::Files {directory} => DiffSource::Files(
+                directory.clone().unwrap_or_else(|| ".".into()).into(),
+            ),
             Commands::Git => DiffSource::Git,
             Commands::Pr { url } => {
                 // Check if the PR URL is actually a GitHub artifact URL

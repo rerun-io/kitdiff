@@ -1,6 +1,6 @@
 use crate::state::{FilteredSnapshot, ViewerAppStateRef, ViewerSystemCommand};
 use eframe::egui;
-use eframe::egui::{Id, TextEdit, Ui};
+use eframe::egui::{Id, ScrollArea, TextEdit, Ui};
 use re_ui::UiExt;
 use re_ui::list_item::{LabelContent, ListItem};
 use std::collections::BTreeMap;
@@ -17,29 +17,31 @@ pub fn file_tree(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
         state.app.send(ViewerSystemCommand::SetFilter(filter));
     }
 
-    ui.list_item_scope("file_tree", |ui| {
-        let mut tree = BTreeMap::new();
+    ScrollArea::vertical().show(ui, |ui| {
+        ui.list_item_scope("file_tree", |ui| {
+            let mut tree = BTreeMap::new();
 
-        for (snapshot_index, snapshot) in &state.filtered_snapshots {
-            let prefix = snapshot.path.parent().and_then(|p| p.to_str());
-            tree.entry(prefix)
-                .or_insert(vec![])
-                .push((*snapshot_index, *snapshot))
-        }
-
-        for (prefix, snapshots) in tree {
-            if let Some(prefix) = prefix {
-                ui.list_item().show_hierarchical_with_children(
-                    ui,
-                    Id::new(prefix),
-                    true,
-                    LabelContent::new(prefix),
-                    |ui| show_prefix(ui, state, &snapshots),
-                );
-            } else {
-                show_prefix(ui, state, &snapshots);
+            for (snapshot_index, snapshot) in &state.filtered_snapshots {
+                let prefix = snapshot.path.parent().and_then(|p| p.to_str());
+                tree.entry(prefix)
+                    .or_insert(vec![])
+                    .push((*snapshot_index, *snapshot))
             }
-        }
+
+            for (prefix, snapshots) in tree {
+                if let Some(prefix) = prefix {
+                    ui.list_item().show_hierarchical_with_children(
+                        ui,
+                        Id::new(prefix),
+                        true,
+                        LabelContent::new(prefix),
+                        |ui| show_prefix(ui, state, &snapshots),
+                    );
+                } else {
+                    show_prefix(ui, state, &snapshots);
+                }
+            }
+        });
     });
 }
 

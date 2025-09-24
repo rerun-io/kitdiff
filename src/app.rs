@@ -5,11 +5,11 @@ use crate::github_auth::{GitHubAuth, github_artifact_api_url, parse_github_artif
 use crate::github_pr::{GithubPr, parse_github_pr_url};
 use crate::settings::Settings;
 use crate::snapshot::{FileReference, Snapshot};
-use crate::state::{AppState, PageRef, SystemCommand};
-use crate::{DiffSource, PathOrBlob, home, viewer};
+use crate::state::{AppState, AppStateRef, PageRef, SystemCommand, ViewerSystemCommand};
+use crate::{DiffSource, PathOrBlob, home, viewer, bar};
 use eframe::egui::panel::Side;
 use eframe::egui::{
-    Align, Context, Image, ImageSource, Modifiers, RichText, ScrollArea, SizeHint, Slider,
+    Align, Context, Image, ImageSource, Key, Modifiers, RichText, ScrollArea, SizeHint, Slider,
     TextEdit, TextureFilter, TextureOptions,
 };
 use eframe::{Frame, Storage, egui};
@@ -92,6 +92,9 @@ impl eframe::App for App {
             let state_ref = self
                 .state
                 .reference(ctx, &self.diff_loader, self.inbox.sender());
+
+            bar::bar(ctx, &state_ref);
+
             match &state_ref.page {
                 PageRef::Home => {
                     home::home_view(ctx, &state_ref);
@@ -100,6 +103,8 @@ impl eframe::App for App {
                     viewer::viewer_ui(ctx, &diff.with_app(&state_ref));
                 }
             }
+
+            Self::end_frame(ctx, &state_ref)
         }
 
         // for file in &ctx.input(|i| i.raw.dropped_files.clone()) {
@@ -172,22 +177,49 @@ impl eframe::App for App {
         //     //     }
         //     // }
         // }
+    }
+}
 
-        // let mut new_index = None;
-        // if ctx.input_mut(|i| i.consume_key(Modifiers::NONE, egui::Key::ArrowDown)) {
-        //     // Find next snapshot that matches filter
-        //     if current_filtered_index + 1 < filtered.len() {
-        //         new_index = Some(filtered[current_filtered_index + 1].0);
-        //     }
-        // }
-        // if ctx.input_mut(|i| i.consume_key(Modifiers::NONE, egui::Key::ArrowUp)) {
-        //     // Find previous snapshot that matches filter
-        //     if current_filtered_index > 0 {
-        //         new_index = Some(filtered[current_filtered_index - 1].0);
-        //     }
-        // }
-        // if let Some(new_index) = new_index {
-        //     self.index = new_index;
-        // }
+impl App {
+    fn end_frame(ctx: &Context, state: &AppStateRef<'_>) {
+        match &state.page {
+            PageRef::Home => {}
+            PageRef::DiffViewer(vs) => {
+                let mut new_index = None;
+                if ctx.input_mut(|i| i.consume_key(Modifiers::NONE, egui::Key::ArrowDown)) {
+                    // Find next snapshot that matches filter
+                    if vs.active_filtered_index + 1 < vs.filtered_snapshots.len() {
+                        new_index = Some(vs.filtered_snapshots[vs.active_filtered_index + 1].0);
+                    }
+                }
+                if ctx.input_mut(|i| i.consume_key(Modifiers::NONE, egui::Key::ArrowUp)) {
+                    // Find previous snapshot that matches filter
+                    if vs.active_filtered_index > 0 {
+                        new_index = Some(vs.filtered_snapshots[vs.active_filtered_index - 1].0);
+                    }
+                }
+                if let Some(new_index) = new_index {
+                    state.send(ViewerSystemCommand::SelectSnapshot(new_index));
+                }
+
+
+                let handle_key = |key: Key, toggle: &mut bool| {
+                    if ctx.input_mut(|i| i.key_pressed(key)) {
+                        *toggle = true;
+                    }
+                    if ctx.input_mut(|i| i.key_released(key)) {
+                        *toggle = false;
+                    }
+                };
+
+                let mut view_filter = vs.state.view_filter;
+                handle_key(Key::Num1, &mut view_filter.show_old);
+                handle_key(Key::Num2, &mut view_filter.show_new);
+                handle_key(Key::Num3, &mut view_filter.show_diff);
+                if view_filter != vs.state.view_filter {
+                    state.send(ViewerSystemCommand::SetViewFilter(view_filter));
+                }
+            }
+        }
     }
 }

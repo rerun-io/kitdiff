@@ -1,11 +1,21 @@
 use crate::github_model::GithubRepoLink;
+use crate::state::SystemCommand;
 use eframe::egui;
 use ehttp;
 use serde_json;
 use std::fmt;
 use std::sync::mpsc;
 
-pub enum GithubAuthCommand {}
+pub enum GithubAuthCommand {
+    Login,
+    Logout,
+}
+
+impl From<GithubAuthCommand> for SystemCommand {
+    fn from(cmd: GithubAuthCommand) -> Self {
+        SystemCommand::GithubAuth(cmd)
+    }
+}
 
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AuthState {
@@ -14,10 +24,11 @@ pub struct AuthState {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LoggedInState {
-    pub access_token: String,
-    pub provider_token: String, // GitHub OAuth token
+    pub supabase_token: String,
+    pub github_token: String, // GitHub OAuth token
     expires_at: u64,
-    username: String,
+    pub username: String,
+    pub user_image: Option<String>,
 }
 
 #[derive(Debug)]
@@ -30,14 +41,22 @@ pub struct GitHubAuth {
 }
 
 impl GitHubAuth {
-    pub fn client(&self) -> octocrab::Octocrab {
-        let mut builder = octocrab_wasm::builder();
+    fn make_client(token: Option<&str>) -> octocrab::Octocrab {
+        let builder = octocrab_wasm::builder();
 
-        if let Some(state) = &self.state.logged_in {
-            builder = builder.user_access_token(state.provider_token.clone());
+        let mut client = builder.build().expect("Failed to build Octocrab client");
+
+        if let Some(token) = token {
+            client = client
+                .user_access_token(token.to_string())
+                .expect("Invalid token");
         }
 
-        builder.build().expect("Failed to build Octocrab client")
+        client
+    }
+
+    pub fn client(&self) -> octocrab::Octocrab {
+        Self::make_client(self.get_token())
     }
 }
 
@@ -128,12 +147,27 @@ impl GitHubAuth {
 
         let (auth_sender, auth_receiver) = mpsc::channel();
 
-        Self {
+        let mut this = Self {
             supabase_url,
             supabase_anon_key,
             state,
             auth_sender,
             auth_receiver,
+        };
+
+        this.check_for_auth_callback();
+
+        this
+    }
+
+    pub fn handle(&mut self, cmd: GithubAuthCommand) {
+        match cmd {
+            GithubAuthCommand::Login => {
+                self.login_github();
+            }
+            GithubAuthCommand::Logout => {
+                self.logout();
+            }
         }
     }
 
@@ -177,10 +211,11 @@ impl GitHubAuth {
                                         let expires_at = get_current_timestamp() + (24 * 60 * 60); // 24 hours
 
                                         let logged_in_state = LoggedInState {
-                                            access_token: access_token.clone(),
-                                            provider_token: github_token,
+                                            supabase_token: access_token.clone(),
+                                            github_token: github_token,
                                             expires_at,
                                             username,
+                                            user_image: None, // Could fetch user image if needed
                                         };
                                         let auth_state = AuthState {
                                             logged_in: Some(logged_in_state),
@@ -287,7 +322,7 @@ impl GitHubAuth {
             self.state
                 .logged_in
                 .as_ref()
-                .map(|s| s.provider_token.as_str())
+                .map(|s| s.github_token.as_str())
         } else {
             None
         }

@@ -1,9 +1,22 @@
 use crate::settings::ImageMode;
 use crate::state::{SystemCommand, ViewerAppStateRef, ViewerSystemCommand};
-use eframe::egui::{Slider, TextureFilter, Ui};
+use eframe::egui::{Key, KeyboardShortcut, Modifiers, Slider, TextureFilter, Ui};
 
 pub fn viewer_options(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
     let mut settings = state.app.settings.clone();
+
+    ui.group(|ui| {
+        ui.strong("View only");
+        let mut view_filter = state.view_filter;
+        ui.checkbox(&mut view_filter.show_old, "Old (1)");
+        ui.checkbox(&mut view_filter.show_new, "New (2)");
+        ui.checkbox(&mut view_filter.show_diff, "Diff (3)");
+        if view_filter != state.view_filter {
+            state
+                .app
+                .send(ViewerSystemCommand::SetViewFilter(view_filter));
+        }
+    });
 
     ui.add(Slider::new(&mut settings.new_opacity, 0.0..=1.0).text("New Opacity"));
     ui.add(Slider::new(&mut settings.diff_opacity, 0.0..=1.0).text("Diff Opacity"));
