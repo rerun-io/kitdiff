@@ -7,8 +7,10 @@ use std::path::PathBuf;
 #[derive(Debug, Clone)]
 pub struct Snapshot {
     pub path: PathBuf,
-    pub old: FileReference,
-    pub new: FileReference,
+    /// If only old is set, the file was deleted.
+    pub old: Option<FileReference>,
+    /// If only new is set, the file was added.
+    pub new: Option<FileReference>,
     pub diff: Option<PathBuf>,
 }
 
@@ -39,12 +41,20 @@ impl Snapshot {
             .unwrap_or_else(|| self.path.as_os_str().to_string_lossy())
     }
 
-    pub fn old_uri(&self) -> String {
-        self.old.to_uri()
+    pub fn added(&self) -> bool {
+        self.old.is_none() && self.new.is_some()
     }
 
-    pub fn new_uri(&self) -> String {
-        self.new.to_uri()
+    pub fn deleted(&self) -> bool {
+        self.old.is_some() && self.new.is_none()
+    }
+
+    pub fn old_uri(&self) -> Option<String> {
+        self.old.as_ref().map(|p| p.to_uri())
+    }
+
+    pub fn new_uri(&self) -> Option<String> {
+        self.new.as_ref().map(|p| p.to_uri())
     }
 
     pub fn file_diff_uri(&self) -> Option<String> {
@@ -53,17 +63,14 @@ impl Snapshot {
             .map(|p| format!("file://{}", p.display()))
     }
 
-    pub fn diff_uri(&self, use_file_if_available: bool, options: DiffOptions) -> String {
+    pub fn diff_uri(&self, use_file_if_available: bool, options: DiffOptions) -> Option<String> {
         use_file_if_available
             .then(|| self.file_diff_uri())
             .flatten()
-            .unwrap_or_else(|| {
-                diff_image_loader::DiffUri {
-                    old: self.old_uri(),
-                    new: self.new_uri(),
-                    options,
-                }
-                .to_uri()
+            .or_else(|| {
+                self.old_uri()
+                    .zip(self.new_uri())
+                    .map(|(old, new)| diff_image_loader::DiffUri { old, new, options }.to_uri())
             })
     }
 
@@ -74,20 +81,24 @@ impl Snapshot {
         opacity: f32,
         show_all: bool,
     ) -> eframe::egui::Image {
-        eframe::egui::Image::new(uri)
+        let mut image = eframe::egui::Image::new(uri)
             .texture_options(eframe::egui::TextureOptions {
                 magnification: state.settings.texture_magnification,
                 ..eframe::egui::TextureOptions::default()
-            })
-            .fit_to_original_size(match state.settings.mode {
-                crate::settings::ImageMode::Pixel => 1.0 / state.egui_ctx.pixels_per_point(),
-                crate::settings::ImageMode::Fit => 0.0,
             })
             .tint(Color32::from_white_alpha(if show_all {
                 u8::MAX
             } else {
                 (255.0 * opacity) as u8
-            }))
+            }));
+
+        match state.settings.mode {
+            crate::settings::ImageMode::Pixel => {
+                image = image.fit_to_original_size(1.0 / state.egui_ctx.pixels_per_point());
+            }
+            crate::settings::ImageMode::Fit => {}
+        }
+        image
     }
 
     pub fn old_image(&self, state: &AppStateRef<'_>) -> Option<eframe::egui::Image> {
@@ -96,7 +107,10 @@ impl Snapshot {
         };
         let show_all = vs.view_filter.all();
         let show_old = vs.view_filter.show_old;
-        (show_all || show_old).then(|| self.make_image(state, self.old_uri(), 1.0, show_all))
+        (show_all || show_old)
+            .then(|| self.old_uri())
+            .flatten()
+            .map(|uri| self.make_image(state, uri, state.settings.new_opacity, show_all))
     }
 
     pub fn new_image(&self, state: &AppStateRef<'_>) -> Option<eframe::egui::Image> {
@@ -106,7 +120,9 @@ impl Snapshot {
         let show_all = vs.view_filter.all();
         let show_new = vs.view_filter.show_new;
         (show_all || show_new)
-            .then(|| self.make_image(state, self.new_uri(), state.settings.new_opacity, show_all))
+            .then(|| self.new_uri())
+            .flatten()
+            .map(|new_uri| self.make_image(state, new_uri, state.settings.new_opacity, show_all))
     }
 
     pub fn diff_image(&self, state: &AppStateRef<'_>) -> Option<eframe::egui::Image> {
@@ -115,9 +131,9 @@ impl Snapshot {
         };
         let show_all = vs.view_filter.all();
         let show_diff = vs.view_filter.show_diff;
-        (show_all || show_diff).then(|| {
-            let diff_uri = self.diff_uri(state.settings.use_original_diff, state.settings.options);
-            self.make_image(state, diff_uri, state.settings.diff_opacity, show_all)
-        })
+        (show_all || show_diff)
+            .then(|| self.diff_uri(state.settings.use_original_diff, state.settings.options))
+            .flatten()
+            .map(|diff_uri| self.make_image(state, diff_uri, state.settings.diff_opacity, show_all))
     }
 }

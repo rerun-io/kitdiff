@@ -321,9 +321,9 @@ fn create_git_snapshot(
 
     Ok(Some(Snapshot {
         path: relative_path.to_path_buf(),
-        old: FileReference::Source(default_image_source), // Default branch version as ImageSource
-        new: FileReference::Path(current_path.to_path_buf()), // Current working tree version
-        diff: None,                                       // Always None for git mode
+        old: Some(FileReference::Source(default_image_source)), // Default branch version as ImageSource
+        new: Some(FileReference::Path(current_path.to_path_buf())), // Current working tree version
+        diff: None,                                             // Always None for git mode
     }))
 }
 
@@ -433,9 +433,9 @@ fn create_pr_snapshot(
 
     Ok(Some(Snapshot {
         path: relative_path.to_path_buf(),
-        old: FileReference::Source(base_image_source), // Base branch version
-        new: FileReference::Source(head_image_source), // Head branch version
-        diff: None,                                    // Always None for PR mode
+        old: Some(FileReference::Source(base_image_source)), // Base branch version
+        new: Some(FileReference::Source(head_image_source)), // Head branch version
+        diff: None,                                          // Always None for PR mode
     }))
 }
 

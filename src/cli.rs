@@ -34,7 +34,11 @@ impl Commands {
                 if let Some((repo, artifact_id)) = parse_github_artifact_url(url) {
                     DiffSource::GHArtifact { repo, artifact_id }
                 } else {
-                    DiffSource::Pr(url.clone())
+                    if let Ok(parsed_url) = url.parse() {
+                        DiffSource::Pr(parsed_url)
+                    } else {
+                        panic!("Invalid GitHub PR URL: {}", url);
+                    }
                 }
             }
             Commands::Zip { source } => {

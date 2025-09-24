@@ -8,6 +8,7 @@ use octocrab::{AuthState, Error, Octocrab};
 use std::collections::HashMap;
 use std::future::ready;
 use std::pin::pin;
+use std::str::FromStr;
 use std::sync::mpsc;
 use std::task::Poll;
 // Import octocrab models
@@ -134,7 +135,8 @@ impl GithubPr {
 
                     if let Some(html_url) = &details.html_url {
                         if ui.button("Compare PR Branches").clicked() {
-                            selected_source = Some(DiffSource::Pr(html_url.to_string()));
+                            selected_source =
+                                Some(DiffSource::Pr(html_url.to_string().parse().unwrap()));
                         }
                     }
 
@@ -202,7 +204,7 @@ async fn get_pr_runs_by_commit(
         .send()
         .await?
         .into_stream(&repo);
-    
+
     let mut page = pin!(page);
 
     while let Some(run) = page.next().await.transpose()? {

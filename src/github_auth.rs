@@ -1,13 +1,11 @@
+use crate::github_model::GithubRepoLink;
 use eframe::egui;
 use ehttp;
 use serde_json;
 use std::fmt;
 use std::sync::mpsc;
-use crate::github_model::GithubRepoLink;
 
-pub enum GithubAuthCommand {
-    
-}
+pub enum GithubAuthCommand {}
 
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AuthState {
@@ -29,6 +27,18 @@ pub struct GitHubAuth {
     state: AuthState,
     auth_sender: AuthSender,
     auth_receiver: AuthReceiver,
+}
+
+impl GitHubAuth {
+    pub fn client(&self) -> octocrab::Octocrab {
+        let mut builder = octocrab_wasm::builder();
+
+        if let Some(state) = &self.state.logged_in {
+            builder = builder.user_access_token(state.provider_token.clone());
+        }
+
+        builder.build().expect("Failed to build Octocrab client")
+    }
 }
 
 #[derive(Debug)]

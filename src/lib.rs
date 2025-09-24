@@ -5,7 +5,8 @@ use eframe::egui::Context;
 use eframe::egui::load::Bytes;
 use std::any::Any;
 use std::sync::mpsc::Sender;
-use crate::github_model::GithubRepoLink;
+use crate::github_model::{GithubPrLink, GithubRepoLink};
+use crate::state::AppState;
 
 pub mod app;
 pub mod diff_image_loader;
@@ -28,7 +29,7 @@ pub enum DiffSource {
     Files,
     #[cfg(not(target_arch = "wasm32"))]
     Git,
-    Pr(String),
+    Pr(GithubPrLink),
     Zip(PathOrBlob),
     TarGz(PathOrBlob),
     GHArtifact {
@@ -41,34 +42,34 @@ impl DiffSource {
     pub fn load(
         self,
         ctx: Context,
-        auth: Option<&LoggedInState>,
+        state: &AppState,
     ) -> SnapshotLoader {
         match self {
             #[cfg(not(target_arch = "wasm32"))]
             DiffSource::Files => {
                 Box::new(native_loaders::file_loader::FileLoader::new("."))
             }
-            _ => todo!()
             // #[cfg(not(target_arch = "wasm32"))]
             // DiffSource::Git => {
             //     native_loaders::git_loader::git_discovery(tx, ctx)
             //         .expect("Failed to run git discovery");
             //     None
             // }
-            // DiffSource::Pr(url) => {
-            //     #[cfg(not(target_arch = "wasm32"))]
-            //     {
-            //         native_loaders::git_loader::pr_git_discovery(url, tx, ctx)
-            //             .expect("Failed to run PR git discovery");
-            //     }
-            //     #[cfg(target_arch = "wasm32")]
-            //     {
-            //         eprintln!(
-            //             "PR git discovery not supported on WASM. Use GitHub artifacts instead."
-            //         );
-            //     }
-            //     None
-            // }
+            DiffSource::Pr(url) => {
+                // #[cfg(not(target_arch = "wasm32"))]
+                // {
+                //     native_loaders::git_loader::pr_git_discovery(url, tx, ctx)
+                //         .expect("Failed to run PR git discovery");
+                // }
+                // #[cfg(target_arch = "wasm32")]
+                // {
+                //     eprintln!(
+                //         "PR git discovery not supported on WASM. Use GitHub artifacts instead."
+                //     );
+                // }
+                // None
+                Box::new(loaders::pr_loader::PrLoader::new(url, state.github_auth.client()))
+            }
             // DiffSource::Zip(data) => {
             //     #[cfg(target_arch = "wasm32")]
             //     {
@@ -196,6 +197,7 @@ impl DiffSource {
             //         None
             //     }
             // }
+            _ => todo!()
         }
     }
 }

@@ -4,6 +4,7 @@ use std::task::Poll;
 
 pub mod tar_loader;
 pub mod zip_loader;
+pub mod pr_loader;
 
 pub trait LoadSnapshots {
     fn update(&mut self, ctx: &egui::Context);

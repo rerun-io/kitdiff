@@ -11,7 +11,9 @@ pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
             state.app.settings.options,
         );
 
-        if let Some(info) = state.app.diff_image_loader.diff_info(&diff_uri) {
+        if let Some(info) =
+            diff_uri.and_then(|diff_uri| state.app.diff_image_loader.diff_info(&diff_uri))
+        {
             if info.diff == 0 {
                 ui.strong("All differences below threshold!");
             } else {
@@ -42,6 +44,8 @@ pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
 
         let any_loading = is_loading(&old) || is_loading(&new) || is_loading(&diff);
 
+        dbg!(&old, &new);
+
         if let Some(old) = old {
             ui.place(rect, old);
         }
@@ -61,21 +65,18 @@ pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
                     .filtered_snapshots
                     .get((state.active_filtered_index as isize + i) as usize)
                 {
-                    ui.ctx()
-                        .try_load_image(&surrounding_snapshot.old_uri(), SizeHint::default())
-                        .ok();
-                    ui.ctx()
-                        .try_load_image(&surrounding_snapshot.new_uri(), SizeHint::default())
-                        .ok();
-                    ui.ctx()
-                        .try_load_image(
-                            &surrounding_snapshot.diff_uri(
-                                state.app.settings.use_original_diff,
-                                state.app.settings.options,
-                            ),
-                            SizeHint::default(),
-                        )
-                        .ok();
+                    if let Some(old_uri) = surrounding_snapshot.old_uri() {
+                        ui.ctx().try_load_image(&old_uri, SizeHint::default()).ok();
+                    }
+                    if let Some(new_uri) = surrounding_snapshot.new_uri() {
+                        ui.ctx().try_load_image(&new_uri, SizeHint::default()).ok();
+                    }
+                    if let Some(diff_uri) = surrounding_snapshot.diff_uri(
+                        state.app.settings.use_original_diff,
+                        state.app.settings.options,
+                    ) {
+                        ui.ctx().try_load_image(&diff_uri, SizeHint::default()).ok();
+                    }
                 }
             }
         }

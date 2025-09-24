@@ -109,16 +109,16 @@ fn try_create_snapshot(png_path: &Path, base_path: &Path) -> Option<Snapshot> {
         // old.png exists, use original as new and old.png as old
         Some(Snapshot {
             path: relative_path.to_path_buf(),
-            old: FileReference::Path(old_path),
-            new: FileReference::Path(png_path.to_path_buf()),
+            old: Some(FileReference::Path(old_path)),
+            new: Some(FileReference::Path(png_path.to_path_buf())),
             diff: Some(diff_path),
         })
     } else if new_path.exists() {
         // new.png exists, use original as old and new.png as new
         Some(Snapshot {
             path: relative_path.to_path_buf(),
-            old: FileReference::Path(png_path.to_path_buf()),
-            new: FileReference::Path(new_path),
+            old: Some(FileReference::Path(png_path.to_path_buf())),
+            new: Some(FileReference::Path(new_path)),
             diff: Some(diff_path),
         })
     } else {

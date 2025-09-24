@@ -88,13 +88,13 @@ fn run_zip_discovery(
 
             // Include bytes in egui context for loading
             match &snapshot.old {
-                FileReference::Source(ImageSource::Bytes { uri, bytes }) => {
+                Some(FileReference::Source(ImageSource::Bytes { uri, bytes })) => {
                     ctx.include_bytes(uri.clone(), bytes.clone());
                 }
                 _ => {}
             }
             match &snapshot.new {
-                FileReference::Source(ImageSource::Bytes { uri, bytes }) => {
+                Some(FileReference::Source(ImageSource::Bytes { uri, bytes })) => {
                     ctx.include_bytes(uri.clone(), bytes.clone());
                 }
                 _ => {}
@@ -137,14 +137,14 @@ fn try_create_zip_snapshot(png_path: &Path, files: &HashMap<PathBuf, Vec<u8>>) -
         let old_data = files.get(&old_path)?;
         Some(Snapshot {
             path: png_path.to_path_buf(),
-            old: FileReference::Source(ImageSource::Bytes {
+            old: Some(FileReference::Source(ImageSource::Bytes {
                 uri: Cow::Owned(format!("zip://{}", old_path.display())),
                 bytes: eframe::egui::load::Bytes::Shared(old_data.clone().into()),
-            }),
-            new: FileReference::Source(ImageSource::Bytes {
+            })),
+            new: Some(FileReference::Source(ImageSource::Bytes {
                 uri: Cow::Owned(format!("zip://{}", png_path.display())),
                 bytes: eframe::egui::load::Bytes::Shared(base_data.clone().into()),
-            }),
+            })),
             diff: None, // We'll handle diff separately if needed
         })
     } else if files.contains_key(&new_path) {
@@ -152,14 +152,14 @@ fn try_create_zip_snapshot(png_path: &Path, files: &HashMap<PathBuf, Vec<u8>>) -
         let new_data = files.get(&new_path)?;
         Some(Snapshot {
             path: png_path.to_path_buf(),
-            old: FileReference::Source(ImageSource::Bytes {
+            old: Some(FileReference::Source(ImageSource::Bytes {
                 uri: Cow::Owned(format!("zip://{}", png_path.display())),
                 bytes: eframe::egui::load::Bytes::Shared(base_data.clone().into()),
-            }),
-            new: FileReference::Source(ImageSource::Bytes {
+            })),
+            new: Some(FileReference::Source(ImageSource::Bytes {
                 uri: Cow::Owned(format!("zip://{}", new_path.display())),
                 bytes: eframe::egui::load::Bytes::Shared(new_data.clone().into()),
-            }),
+            })),
             diff: None, // We'll handle diff separately if needed
         })
     } else {

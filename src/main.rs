@@ -8,6 +8,13 @@ use kitdiff::app::App;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
+
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("Failed to create Tokio runtime");
+    let _guard = rt.enter();
+
     use clap::Parser;
     let mode = cli::Cli::parse();
 

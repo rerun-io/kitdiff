@@ -208,7 +208,7 @@ impl AppState {
             SystemCommand::Open(source) => {
                 let loader = source.load(
                     ctx.clone(),
-                    self.github_auth.get_auth_state().logged_in.as_ref(),
+                    &self,
                 );
                 self.page = Page::DiffViewer(ViewerState {
                     filter: String::new(),

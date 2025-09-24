@@ -3,10 +3,38 @@ use std::str::FromStr;
 
 pub type PrNumber = u64;
 
+#[derive(Debug)]
+pub enum GithubParseErr {
+    MissingOwner,
+    MissingRepo,
+    MissingPullSegment,
+    MissingPrNumber,
+    InvalidPrNumber(std::num::ParseIntError),
+}
+
 #[derive(Debug, Clone)]
 pub struct GithubRepoLink {
     pub owner: String,
     pub repo: String,
+}
+
+impl FromStr for GithubRepoLink {
+    type Err = GithubParseErr;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.strip_prefix("https://github.com/").unwrap_or(s);
+
+        // Parse strings like "owner/repo"
+        let mut parts = s.split('/');
+
+        let owner = parts.next().ok_or(GithubParseErr::MissingOwner)?;
+        let repo = parts.next().ok_or(GithubParseErr::MissingRepo)?;
+
+        Ok(GithubRepoLink {
+            owner: owner.to_string(),
+            repo: repo.to_string(),
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -22,10 +50,28 @@ impl GithubPrLink {
 }
 
 impl FromStr for GithubPrLink {
-    type Err = String;
+    type Err = GithubParseErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
+        let s = s.strip_prefix("https://github.com/").unwrap_or(s);
+
+        let mut parts = s.split('/');
+        let owner = parts.next().ok_or(GithubParseErr::MissingOwner)?;
+        let repo = parts.next().ok_or(GithubParseErr::MissingRepo)?;
+        _ = parts.next().ok_or(GithubParseErr::MissingPullSegment)?;
+        let number: PrNumber = parts
+            .next()
+            .ok_or(GithubParseErr::MissingPrNumber)?
+            .parse()
+            .map_err(GithubParseErr::InvalidPrNumber)?;
+
+        Ok(GithubPrLink {
+            repo: GithubRepoLink {
+                owner: owner.to_string(),
+                repo: repo.to_string(),
+            },
+            pr_number: number,
+        })
     }
 }
 
