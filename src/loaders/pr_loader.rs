@@ -1,9 +1,10 @@
 use crate::github_model::{GithubPrLink, GithubRepoLink};
+use crate::github_pr::{pr_ui, GithubPr};
 use crate::loaders::{LoadSnapshots, SnapshotLoader};
 use crate::octokit::RepoClient;
 use crate::snapshot::{FileReference, Snapshot};
 use anyhow::Error;
-use eframe::egui::Context;
+use eframe::egui::{Context, Ui};
 use egui_inbox::{UiInbox, UiInboxSender};
 use futures::StreamExt;
 use octocrab::Octocrab;
@@ -12,18 +13,20 @@ use std::ops::Deref;
 use std::path::Path;
 use std::pin::pin;
 use std::task::Poll;
+use crate::state::AppStateRef;
 
 pub struct PrLoader {
     snapshots: Vec<Snapshot>,
     inbox: UiInbox<Option<Snapshot>>,
     loading: bool,
     link: GithubPrLink,
+    pr_info: GithubPr,
 }
 
 impl PrLoader {
     pub fn new(link: GithubPrLink, client: Octocrab) -> Self {
         let mut inbox = UiInbox::new();
-        let repo_client = RepoClient::new(client, link.repo.clone());
+        let repo_client = RepoClient::new(client.clone(), link.repo.clone());
 
         inbox.spawn(|tx| async move {
             let result = stream_files(repo_client, link.pr_number, tx).await;
@@ -36,6 +39,7 @@ impl PrLoader {
             snapshots: Vec::new(),
             inbox,
             loading: true,
+            pr_info: GithubPr::new(link.clone(), client),
             link,
         }
     }
@@ -87,7 +91,6 @@ async fn stream_files(
                 new: new_url.map(|url| FileReference::Source(url.into())),
                 diff: None,
             };
-            dbg!(&snapshot);
             sender.send(Some(snapshot)).ok();
         }
     }
@@ -112,6 +115,7 @@ impl LoadSnapshots for PrLoader {
                 None => self.loading = false,
             }
         }
+        self.pr_info.update(ctx);
     }
 
     fn snapshots(&self) -> &[Snapshot] {
@@ -124,5 +128,9 @@ impl LoadSnapshots for PrLoader {
         } else {
             Poll::Ready(Ok(()))
         }
+    }
+
+    fn extra_ui(&self, ui: &mut Ui, state: &AppStateRef<'_>) {
+        pr_ui(ui, state, &self.pr_info);
     }
 }

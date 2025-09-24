@@ -1,6 +1,7 @@
 use crate::snapshot::Snapshot;
 use eframe::egui;
 use std::task::Poll;
+use crate::state::AppStateRef;
 
 pub mod tar_loader;
 pub mod zip_loader;
@@ -14,7 +15,7 @@ pub trait LoadSnapshots {
     /// State is separate so that snapshots can be streamed in
     fn state(&self) -> Poll<Result<(), &anyhow::Error>>;
     
-    fn extra_ui(&mut self, ui: &mut egui::Ui) {}
+    fn extra_ui(&self, ui: &mut egui::Ui, state: &AppStateRef<'_>) {}
 }
 
 pub type SnapshotLoader = Box<dyn LoadSnapshots + Send + Sync>;

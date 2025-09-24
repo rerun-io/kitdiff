@@ -222,7 +222,7 @@ impl AppState {
             SystemCommand::LoadPrDetails(url) => {
                 self.github_pr = Some(GithubPr::new(
                     url,
-                    self.github_auth.get_token().map(ToString::to_string),
+                    self.github_auth.client(),
                 ));
             }
             SystemCommand::UpdateSettings(settings) => {

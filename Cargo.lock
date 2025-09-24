@@ -248,9 +248,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.99"
+version = "1.0.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0674a1ddeecb70197781e945de4b3b8ffb61fa939a5597bcf48503737663100"
+checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 
 [[package]]
 name = "arbitrary"
@@ -1016,9 +1016,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.47"
+version = "4.5.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7eac00902d9d136acd712710d71823fb8ac8004ca445a89e73a41d45aa712931"
+checksum = "e2134bb3ea021b78629caa971416385309e0131b351b25e01dc16fb54e1b5fae"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -1026,9 +1026,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.47"
+version = "4.5.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ad9bbf750e73b5884fb8a211a9424a1906c1e156724260fdae972f31d70e1d6"
+checksum = "c2ba64afa3c0a6df7fa517765e31314e983f51dda798ffba27b988194fb65dc9"
 dependencies = [
  "anstream",
  "anstyle",
@@ -1354,9 +1354,9 @@ checksum = "be1e0bca6c3637f992fc1cc7cbc52a78c1ef6db076dbf1059c4323d6a2048376"
 
 [[package]]
 name = "deranged"
-version = "0.5.3"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d630bccd429a5bb5a64b5e94f693bfc48c9f8566418fda4c494cc94f911f87cc"
+checksum = "a41953f86f8a05768a6cda24def994fd2f424b04ec5c719cf89989779f199071"
 dependencies = [
  "powerfmt",
 ]
@@ -1946,9 +1946,9 @@ dependencies = [
 
 [[package]]
 name = "flatbuffers"
-version = "25.2.10"
+version = "25.9.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1045398c1bfd89168b5fd3f1fc11f6e70b34f6f66300c87d44d3de849463abf1"
+checksum = "09b6620799e7340ebd9968d2e0708eb82cf1971e9a16821e2091b6d6e475eed5"
 dependencies = [
  "bitflags 2.9.4",
  "rustc_version",
@@ -2636,7 +2636,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.61.2",
+ "windows-core 0.62.0",
 ]
 
 [[package]]
@@ -2813,9 +2813,9 @@ checksum = "edcd27d72f2f071c64249075f42e205ff93c9a4c5f6c6da53e79ed9f9832c285"
 
 [[package]]
 name = "imgref"
-version = "1.11.0"
+version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0263a3d970d5c054ed9312c0057b4f3bde9c0b33836d3637361d4a9e6e7a408"
+checksum = "e7c5cedc30da3a610cac6b4ba17597bdf7152cf974e8aab3afb3d54455e371c8"
 
 [[package]]
 name = "indent"
@@ -3007,9 +3007,9 @@ dependencies = [
 
 [[package]]
 name = "js-sys"
-version = "0.3.80"
+version = "0.3.81"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "852f13bec5eba4ba9afbeb93fd7c13fe56147f055939ae21c43a29a0ecb2702e"
+checksum = "ec48937a97411dcb524a265206ccd4c90bb711fca92b2792c407f268825b9305"
 dependencies = [
  "once_cell",
  "wasm-bindgen",
@@ -3183,9 +3183,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.175"
+version = "0.2.176"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a82ae493e598baaea5209805c49bbf2ea7de956d50d7da0da1164f9c6d28543"
+checksum = "58f929b4d672ea937a23a1ab494143d968337a5f47e56d0815df1e0890ddf174"
 
 [[package]]
 name = "libfuzzer-sys"
@@ -3213,12 +3213,12 @@ dependencies = [
 
 [[package]]
 name = "libloading"
-version = "0.8.8"
+version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07033963ba89ebaf1584d767badaa2e8fcec21aedea6b8c0346d487d49c28667"
+checksum = "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"
 dependencies = [
  "cfg-if",
- "windows-targets 0.53.3",
+ "windows-link 0.2.0",
 ]
 
 [[package]]
@@ -4544,9 +4544,9 @@ dependencies = [
 
 [[package]]
 name = "pxfm"
-version = "0.1.23"
+version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f55f4fedc84ed39cb7a489322318976425e42a147e2be79d8f878e2884f94e84"
+checksum = "83f9b339b02259ada5c0f4a389b7fb472f933aa17ce176fd2ad98f28bb401fde"
 dependencies = [
  "num-traits",
 ]
@@ -4715,7 +4715,7 @@ dependencies = [
 [[package]]
 name = "re_arrow_util"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "anyhow",
  "arrow",
@@ -4728,7 +4728,7 @@ dependencies = [
 [[package]]
 name = "re_build_info"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "re_byte_size",
  "serde",
@@ -4737,7 +4737,7 @@ dependencies = [
 [[package]]
 name = "re_build_tools"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -4751,7 +4751,7 @@ dependencies = [
 [[package]]
 name = "re_byte_size"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "arrow",
  "half",
@@ -4761,7 +4761,7 @@ dependencies = [
 [[package]]
 name = "re_case"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "convert_case",
 ]
@@ -4769,7 +4769,7 @@ dependencies = [
 [[package]]
 name = "re_chunk"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4800,7 +4800,7 @@ dependencies = [
 [[package]]
 name = "re_chunk_store"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4828,7 +4828,7 @@ dependencies = [
 [[package]]
 name = "re_entity_db"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "ahash",
  "document-features",
@@ -4859,12 +4859,12 @@ dependencies = [
 [[package]]
 name = "re_error"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 
 [[package]]
 name = "re_format"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "half",
  "num-traits",
@@ -4873,7 +4873,7 @@ dependencies = [
 [[package]]
 name = "re_format_arrow"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "arrow",
  "comfy-table",
@@ -4887,7 +4887,7 @@ dependencies = [
 [[package]]
 name = "re_int_histogram"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "smallvec",
  "static_assertions",
@@ -4896,7 +4896,7 @@ dependencies = [
 [[package]]
 name = "re_log"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "env_filter",
  "env_logger",
@@ -4911,7 +4911,7 @@ dependencies = [
 [[package]]
 name = "re_log_encoding"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "arrow",
  "bytes",
@@ -4934,7 +4934,7 @@ dependencies = [
 [[package]]
 name = "re_log_types"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "ahash",
  "arrow",
@@ -4969,7 +4969,7 @@ dependencies = [
 [[package]]
 name = "re_protos"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "arrow",
  "jiff",
@@ -4991,7 +4991,7 @@ dependencies = [
 [[package]]
 name = "re_query"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "ahash",
  "anyhow",
@@ -5018,7 +5018,7 @@ dependencies = [
 [[package]]
 name = "re_smart_channel"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "crossbeam",
  "parking_lot",
@@ -5032,7 +5032,7 @@ dependencies = [
 [[package]]
 name = "re_sorbet"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "arrow",
  "itertools 0.14.0",
@@ -5053,7 +5053,7 @@ dependencies = [
 [[package]]
 name = "re_span"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "num-traits",
 ]
@@ -5061,7 +5061,7 @@ dependencies = [
 [[package]]
 name = "re_string_interner"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "ahash",
  "nohash-hasher",
@@ -5073,7 +5073,7 @@ dependencies = [
 [[package]]
 name = "re_tracing"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "puffin",
 ]
@@ -5081,7 +5081,7 @@ dependencies = [
 [[package]]
 name = "re_tuid"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "bytemuck",
  "document-features",
@@ -5094,7 +5094,7 @@ dependencies = [
 [[package]]
 name = "re_types_core"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "anyhow",
  "arrow",
@@ -5118,7 +5118,7 @@ dependencies = [
 [[package]]
 name = "re_ui"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "ahash",
  "anyhow",
@@ -5153,7 +5153,7 @@ dependencies = [
 [[package]]
 name = "re_uri"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#c0794d9cdf84d2a441a205b2d6e592aa9594d826"
+source = "git+https://github.com/rerun-io/rerun?branch=main#0416b9b8bdbf20bf6d9d18458ca218259deb0484"
 dependencies = [
  "re_log",
  "re_log_types",
@@ -5380,9 +5380,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.31"
+version = "0.23.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0ebcbd2f03de0fc1122ad9bb24b127a5a6cd51d72604a3f3c50ac459762b6cc"
+checksum = "cd3c25631629d034ce7cd9940adc9d45762d46de2b0f57193c4443b92c6d4d40"
 dependencies = [
  "log",
  "once_cell",
@@ -5402,7 +5402,7 @@ dependencies = [
  "openssl-probe",
  "rustls-pki-types",
  "schannel",
- "security-framework 3.4.0",
+ "security-framework 3.5.0",
 ]
 
 [[package]]
@@ -5504,9 +5504,9 @@ dependencies = [
 
 [[package]]
 name = "security-framework"
-version = "3.4.0"
+version = "3.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60b369d18893388b345804dc0007963c99b7d665ae71d275812d828c6f089640"
+checksum = "cc198e42d9b7510827939c9a15f5062a0c913f3371d765977e586d2fe6c16f4a"
 dependencies = [
  "bitflags 2.9.4",
  "core-foundation 0.10.1",
@@ -5543,9 +5543,9 @@ checksum = "1bc711410fbe7399f390ca1c3b60ad0f53f80e95c5eb935e52268a0e2cd49acc"
 
 [[package]]
 name = "serde"
-version = "1.0.225"
+version = "1.0.226"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd6c24dee235d0da097043389623fb913daddf92c76e9f5a1db88607a0bcbd1d"
+checksum = "0dca6411025b24b60bfa7ec1fe1f8e710ac09782dca409ee8237ba74b51295fd"
 dependencies = [
  "serde_core",
  "serde_derive",
@@ -5553,18 +5553,18 @@ dependencies = [
 
 [[package]]
 name = "serde_core"
-version = "1.0.225"
+version = "1.0.226"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "659356f9a0cb1e529b24c01e43ad2bdf520ec4ceaf83047b83ddcc2251f96383"
+checksum = "ba2ba63999edb9dac981fb34b3e5c0d111a69b0924e253ed29d83f7c99e966a4"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.225"
+version = "1.0.226"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ea936adf78b1f766949a4977b91d2f5595825bd6ec079aa9543ad2685fc4516"
+checksum = "8db53ae22f34573731bafa1db20f04027b2d25e02d8205921b569171699cdb33"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5972,9 +5972,9 @@ checksum = "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1"
 
 [[package]]
 name = "tempfile"
-version = "3.22.0"
+version = "3.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84fa4d11fadde498443cca10fd3ac23c951f0dc59e080e9f4b93d4df4e4eea53"
+checksum = "2d31c77bdf42a745371d260a26ca7163f1e0924b64afa0b688e61b5a9fa02f16"
 dependencies = [
  "fastrand",
  "getrandom 0.3.3",
@@ -6599,9 +6599,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen"
-version = "0.2.103"
+version = "0.2.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab10a69fbd0a177f5f649ad4d8d3305499c42bab9aef2f7ff592d0ec8f833819"
+checksum = "c1da10c01ae9f1ae40cbfac0bac3b1e724b320abfcf52229f80b547c0d250e2d"
 dependencies = [
  "cfg-if",
  "once_cell",
@@ -6612,9 +6612,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-backend"
-version = "0.2.103"
+version = "0.2.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0bb702423545a6007bbc368fde243ba47ca275e549c8a28617f56f6ba53b1d1c"
+checksum = "671c9a5a66f49d8a47345ab942e2cb93c7d1d0339065d4f8139c486121b43b19"
 dependencies = [
  "bumpalo",
  "log",
@@ -6626,9 +6626,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-futures"
-version = "0.4.53"
+version = "0.4.54"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0b221ff421256839509adbb55998214a70d829d3a28c69b4a6672e9d2a42f67"
+checksum = "7e038d41e478cc73bae0ff9b36c60cff1c98b8f38f8d7e8061e79ee63608ac5c"
 dependencies = [
  "cfg-if",
  "js-sys",
@@ -6639,9 +6639,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro"
-version = "0.2.103"
+version = "0.2.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc65f4f411d91494355917b605e1480033152658d71f722a90647f56a70c88a0"
+checksum = "7ca60477e4c59f5f2986c50191cd972e3a50d8a95603bc9434501cf156a9a119"
 dependencies = [
  "quote",
  "wasm-bindgen-macro-support",
@@ -6649,9 +6649,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro-support"
-version = "0.2.103"
+version = "0.2.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffc003a991398a8ee604a401e194b6b3a39677b3173d6e74495eb51b82e99a32"
+checksum = "9f07d2f20d4da7b26400c9f4a0511e6e0345b040694e8a75bd41d578fa4421d7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6662,9 +6662,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-shared"
-version = "0.2.103"
+version = "0.2.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "293c37f4efa430ca14db3721dfbe48d8c33308096bd44d80ebaa775ab71ba1cf"
+checksum = "bad67dc8b2a1a6e5448428adec4c3e84c43e561d8c9ee8a9e5aabeb193ec41d1"
 dependencies = [
  "unicode-ident",
 ]
@@ -6780,9 +6780,9 @@ dependencies = [
 
 [[package]]
 name = "web-sys"
-version = "0.3.80"
+version = "0.3.81"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbe734895e869dc429d78c4b433f8d17d95f8d05317440b4fad5ab2d33e596dc"
+checksum = "9367c417a924a74cae129e6a2ae3b47fabb1f8995595ab474029da749a8be120"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
@@ -7076,6 +7076,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "windows-core"
+version = "0.62.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57fe7168f7de578d2d8a05b07fd61870d2e73b4020e9f49aa00da8471723497c"
+dependencies = [
+ "windows-implement 0.60.0",
+ "windows-interface 0.59.1",
+ "windows-link 0.2.0",
+ "windows-result 0.4.0",
+ "windows-strings 0.5.0",
+]
+
+[[package]]
 name = "windows-future"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7182,6 +7195,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "windows-result"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7084dcc306f89883455a206237404d3eaf961e5bd7e0f312f7c91f57eb44167f"
+dependencies = [
+ "windows-link 0.2.0",
+]
+
+[[package]]
 name = "windows-strings"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7198,6 +7220,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56e6c93f3a0c3b36176cb1327a4958a0353d5d166c2a35cb268ace15e91d3b57"
 dependencies = [
  "windows-link 0.1.3",
+]
+
+[[package]]
+name = "windows-strings"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7218c655a553b0bed4426cf54b20d7ba363ef543b52d515b3e48d7fd55318dda"
+dependencies = [
+ "windows-link 0.2.0",
 ]
 
 [[package]]
@@ -7547,9 +7578,9 @@ checksum = "ea6fc2961e4ef194dcbfe56bb845534d0dc8098940c7e5c012a258bfec6701bd"
 
 [[package]]
 name = "xattr"
-version = "1.5.1"
+version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af3a19837351dc82ba89f8a125e22a3c475f05aba604acc023d62b2739ae2909"
+checksum = "32e45ad4206f6d2479085147f02bc2ef834ac85886624a23575ae137c8aa8156"
 dependencies = [
  "libc",
  "rustix 1.1.2",

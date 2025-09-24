@@ -8,6 +8,8 @@ use std::collections::BTreeMap;
 pub fn file_tree(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
     ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
 
+    state.loader.extra_ui(ui, state.app);
+
     let mut filter = state.filter.clone();
     TextEdit::singleline(&mut filter)
         .hint_text("Filter")
