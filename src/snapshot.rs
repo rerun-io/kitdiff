@@ -1,6 +1,7 @@
 use crate::diff_image_loader;
 use crate::diff_image_loader::DiffOptions;
-use eframe::egui::ImageSource;
+use crate::state::{AppStateRef, PageRef, ViewerStateRef};
+use eframe::egui::{Color32, ImageSource};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
@@ -31,6 +32,13 @@ impl FileReference {
 }
 
 impl Snapshot {
+    pub fn file_name(&self) -> std::borrow::Cow<'_, str> {
+        self.path
+            .file_name()
+            .map(|n| n.to_string_lossy())
+            .unwrap_or_else(|| self.path.as_os_str().to_string_lossy())
+    }
+
     pub fn old_uri(&self) -> String {
         self.old.to_uri()
     }
@@ -57,5 +65,59 @@ impl Snapshot {
                 }
                 .to_uri()
             })
+    }
+
+    fn make_image(
+        &self,
+        state: &AppStateRef<'_>,
+        uri: String,
+        opacity: f32,
+        show_all: bool,
+    ) -> eframe::egui::Image {
+        eframe::egui::Image::new(uri)
+            .texture_options(eframe::egui::TextureOptions {
+                magnification: state.settings.texture_magnification,
+                ..eframe::egui::TextureOptions::default()
+            })
+            .fit_to_original_size(match state.settings.mode {
+                crate::settings::ImageMode::Pixel => 1.0 / state.egui_ctx.pixels_per_point(),
+                crate::settings::ImageMode::Fit => 0.0,
+            })
+            .tint(Color32::from_white_alpha(if show_all {
+                u8::MAX
+            } else {
+                (255.0 * opacity) as u8
+            }))
+    }
+
+    pub fn old_image(&self, state: &AppStateRef<'_>) -> Option<eframe::egui::Image> {
+        let PageRef::DiffViewer(vs) = &state.page else {
+            return None;
+        };
+        let show_all = vs.view_filter.all();
+        let show_old = vs.view_filter.show_old;
+        (show_all || show_old).then(|| self.make_image(state, self.old_uri(), 1.0, show_all))
+    }
+
+    pub fn new_image(&self, state: &AppStateRef<'_>) -> Option<eframe::egui::Image> {
+        let PageRef::DiffViewer(vs) = &state.page else {
+            return None;
+        };
+        let show_all = vs.view_filter.all();
+        let show_new = vs.view_filter.show_new;
+        (show_all || show_new)
+            .then(|| self.make_image(state, self.new_uri(), state.settings.new_opacity, show_all))
+    }
+
+    pub fn diff_image(&self, state: &AppStateRef<'_>) -> Option<eframe::egui::Image> {
+        let PageRef::DiffViewer(vs) = &state.page else {
+            return None;
+        };
+        let show_all = vs.view_filter.all();
+        let show_diff = vs.view_filter.show_diff;
+        (show_all || show_diff).then(|| {
+            let diff_uri = self.diff_uri(state.settings.use_original_diff, state.settings.options);
+            self.make_image(state, diff_uri, state.settings.diff_opacity, show_all)
+        })
     }
 }

@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::task::Poll;
 
 #[derive(Default)]
-pub struct DiffLoader {
+pub struct DiffImageLoader {
     image_loader: Arc<ImageCrateLoader>,
     diffs: Arc<Mutex<HashMap<String, Result<Poll<DiffInfo>, LoadError>>>>,
 }
@@ -18,7 +18,7 @@ pub struct DiffInfo {
     pub diff: i32,
 }
 
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DiffOptions {
     pub threshold: f32,
     pub detect_aa_pixels: bool,
@@ -51,7 +51,7 @@ impl DiffUri {
     }
 }
 
-impl DiffLoader {
+impl DiffImageLoader {
     pub fn new(ctx: &Context) -> Self {
         let image_loader = ctx
             .loaders()
@@ -79,7 +79,7 @@ impl DiffLoader {
     }
 }
 
-impl ImageLoader for DiffLoader {
+impl ImageLoader for DiffImageLoader {
     fn id(&self) -> &str {
         "DiffLoader"
     }

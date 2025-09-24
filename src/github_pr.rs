@@ -7,9 +7,12 @@ use futures::{StreamExt, TryStreamExt};
 use octocrab::{AuthState, Error, Octocrab};
 use std::collections::HashMap;
 use std::future::ready;
+use std::pin::pin;
 use std::sync::mpsc;
 use std::task::Poll;
 // Import octocrab models
+use crate::github_model::{GithubPrLink, PrNumber};
+use crate::octokit::RepoClient;
 use octocrab::models::{
     pulls::PullRequest,
     repos::RepoCommit,
@@ -72,22 +75,14 @@ pub struct GithubArtifact {
 }
 
 pub struct GithubPr {
-    pub user: String,
-    pub repo: String,
-    pub pr_number: u32,
+    link: GithubPrLink,
     pub auth_token: Option<String>,
     inbox: UiInbox<Result<PrWithArtifacts, octocrab::Error>>,
     pub data: Poll<Result<PrWithArtifacts, octocrab::Error>>,
 }
 
 impl GithubPr {
-    pub fn new(
-        user: String,
-        repo: String,
-        pr_number: u32,
-        ctx: Context,
-        auth_token: Option<String>,
-    ) -> Self {
+    pub fn new(link: GithubPrLink, auth_token: Option<String>) -> Self {
         let mut client = octocrab_wasm::builder()
             .build()
             .expect("Failed to build Octocrab client");
@@ -101,20 +96,15 @@ impl GithubPr {
         let mut inbox = UiInbox::new();
 
         {
-            let client = client.clone();
-            let user = user.clone();
-            let repo = repo.clone();
-            let pr_number = pr_number;
+            let client = RepoClient::new(client, link.repo.clone());
             inbox.spawn(|tx| async move {
-                let details = get_all_pr_artifacts(&client, &user, &repo, pr_number as u64).await;
+                let details = get_all_pr_artifacts(&client, link.pr_number).await;
                 let _ = tx.send(details);
             });
         }
 
         Self {
-            user: user.clone(),
-            repo: repo.clone(),
-            pr_number,
+            link,
             auth_token: auth_token.clone(),
             inbox,
             data: Poll::Pending,
@@ -130,7 +120,7 @@ impl GithubPr {
         let mut selected_source = None;
 
         ui.group(|ui| {
-            ui.heading(format!("GitHub PR #{}", self.pr_number));
+            ui.heading(format!("GitHub PR #{}", self.link.pr_number));
 
             match &self.data {
                 Poll::Ready(Ok(data)) => {
@@ -167,8 +157,7 @@ impl GithubPr {
                                         for artifact in artifacts {
                                             if ui.button(&artifact.name).clicked() {
                                                 selected_source = Some(DiffSource::GHArtifact {
-                                                    owner: self.user.clone(),
-                                                    repo: self.repo.clone(),
+                                                    repo: self.link.repo.clone(),
                                                     artifact_id: artifact.id.to_string(),
                                                 });
                                             }
@@ -193,44 +182,34 @@ impl GithubPr {
 }
 
 async fn get_pr_runs_by_commit(
-    octocrab: &Octocrab,
-    owner: &str,
-    repo: &str,
-    pr_number: u64,
+    repo: &RepoClient,
+    pr_number: PrNumber,
 ) -> octocrab::Result<HashMap<String, Vec<Run>>> {
     // First, get the PR to find the head branch
-    let pr = octocrab.pulls(owner, repo).get(pr_number).await?;
+    let pr = repo.pulls().get(pr_number).await?;
 
     // Get the branch name from the PR
     let branch_name = &pr.head.ref_field;
 
     // List all workflow runs for this branch
     let mut runs_by_commit: HashMap<String, Vec<Run>> = HashMap::new();
-    let mut page = 1u32;
 
-    loop {
-        let runs = octocrab
-            .workflows(owner, repo)
-            .list_all_runs()
-            .branch(branch_name)
-            .page(page)
-            .per_page(100)
-            .send()
-            .await?;
+    let page = repo
+        .workflows()
+        .list_all_runs()
+        .branch(branch_name)
+        .per_page(100)
+        .send()
+        .await?
+        .into_stream(&repo);
+    
+    let mut page = pin!(page);
 
-        // Group runs by commit SHA
-        for run in runs.items {
-            runs_by_commit
-                .entry(run.head_sha.clone())
-                .or_insert_with(Vec::new)
-                .push(run);
-        }
-
-        // Check if there are more pages
-        if runs.next.is_none() {
-            break;
-        }
-        page += 1;
+    while let Some(run) = page.next().await.transpose()? {
+        runs_by_commit
+            .entry(run.head_sha.clone())
+            .or_insert_with(Vec::new)
+            .push(run);
     }
 
     Ok(runs_by_commit)
@@ -238,20 +217,14 @@ async fn get_pr_runs_by_commit(
 
 // Get all commits for a PR to get a complete picture
 async fn get_pr_commits_with_runs(
-    octocrab: &Octocrab,
-    owner: &str,
-    repo: &str,
-    pr_number: u64,
+    repo: &RepoClient,
+    pr: PrNumber,
 ) -> octocrab::Result<Vec<(RepoCommit, Vec<Run>)>> {
     // Get all commits in the PR
-    let commits = octocrab
-        .pulls(owner, repo)
-        .pr_commits(pr_number)
-        .send()
-        .await?;
+    let commits = repo.pulls().pr_commits(pr).send().await?;
 
     // Get all runs grouped by commit
-    let runs_by_commit = get_pr_runs_by_commit(octocrab, owner, repo, pr_number).await?;
+    let runs_by_commit = get_pr_runs_by_commit(repo, pr).await?;
 
     Ok(commits
         .items
@@ -272,19 +245,16 @@ struct PrWithArtifacts {
 }
 
 async fn get_all_pr_artifacts(
-    octocrab: &Octocrab,
-    owner: &str,
-    repo: &str,
-    pr_number: u64,
+    repo: &RepoClient,
+    pr: PrNumber,
 ) -> octocrab::Result<PrWithArtifacts> {
-    let commits_with_runs = get_pr_commits_with_runs(octocrab, owner, repo, pr_number).await?;
+    let commits_with_runs = get_pr_commits_with_runs(repo, pr).await?;
 
     let mut artifacts_by_commit = Vec::new();
     for (commit, runs) in commits_with_runs {
         let artifacts = FuturesUnordered::from_iter(runs.into_iter().map(|run| async move {
-            octocrab
-                .actions()
-                .list_workflow_run_artifacts(owner, repo, run.id.into())
+            repo.actions()
+                .list_workflow_run_artifacts(&repo.repo().owner, &repo.repo().repo, run.id)
                 .send()
                 .await
         }))
@@ -300,7 +270,7 @@ async fn get_all_pr_artifacts(
         artifacts_by_commit.push((commit, artifacts));
     }
 
-    let pr = octocrab.pulls(owner, repo).get(pr_number).await?;
+    let pr = repo.pulls().get(pr).await?;
 
     Ok(PrWithArtifacts {
         pr,

@@ -30,10 +30,13 @@ zip = { version = "5", default-features = false, features = ["deflate"] }
 flate2 = { version = "1.1" }
 tar = { version = "0.4" }
 chrono = { version = "0.4", features = ["serde"] }
-octocrab = { version = "0.45.0", default-features = false }
+octocrab = { version = "0.45.0", default-features = false, features = ["stream"] }
 octocrab-wasm = { path = "crates/octocrab-wasm" }
 egui_inbox = { version = "0.9.0", features = ["async", "tokio"] }
 futures = "0.3"
+re_ui = "0.26.0-alpha.1+dev"
+getrandom = { version = "0.3", features = ["wasm_js"] }
+anyhow = "1.0.99"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -64,6 +67,9 @@ opt-level = 2
 egui = { git = "https://github.com/emilk/egui", branch = "lucas/experiments/kitdiff" }
 eframe = { git = "https://github.com/emilk/egui", branch = "lucas/experiments/kitdiff" }
 egui_extras = { git = "https://github.com/emilk/egui", branch = "lucas/experiments/kitdiff" }
+
+re_ui = { git = "https://github.com/rerun-io/rerun", branch = "main" }
+egui_commonmark = { git = "https://github.com/rerun-io/egui_commonmark.git", branch = "lucas/update-egui-main" }
 
 # If you fork https://github.com/emilk/egui you can test with:
 # egui = { path = "../egui/crates/egui" }

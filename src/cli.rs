@@ -31,57 +31,55 @@ impl Commands {
             Commands::Git => DiffSource::Git,
             Commands::Pr { url } => {
                 // Check if the PR URL is actually a GitHub artifact URL
-                if let Some((owner, repo, artifact_id)) = parse_github_artifact_url(url) {
-                    DiffSource::GHArtifact {
-                        owner,
-                        repo,
-                        artifact_id,
-                    }
+                if let Some((repo, artifact_id)) = parse_github_artifact_url(url) {
+                    DiffSource::GHArtifact { repo, artifact_id }
                 } else {
                     DiffSource::Pr(url.clone())
                 }
             }
             Commands::Zip { source } => {
-                // Check if it's a GitHub artifact URL first
-                if let Some((owner, repo, artifact_id)) = parse_github_artifact_url(source) {
-                    DiffSource::GHArtifact {
-                        owner,
-                        repo,
-                        artifact_id,
-                    }
-                } else if source.starts_with("http://") || source.starts_with("https://") {
-                    #[cfg(target_arch = "wasm32")]
-                    {
-                        if source.ends_with(".tar.gz") || source.ends_with(".tgz") {
-                            DiffSource::TarGz(kitdiff::PathOrBlob::Url(source.clone(), None))
-                        } else {
-                            DiffSource::Zip(kitdiff::PathOrBlob::Url(source.clone(), None))
-                        }
-                    }
-                    #[cfg(not(target_arch = "wasm32"))]
-                    {
-                        panic!(
-                            "URL sources not supported on native platforms. Use 'gh-artifact' command for GitHub artifacts or download and provide a local file path."
-                        );
-                    }
-                } else {
-                    if source.ends_with(".tar.gz") || source.ends_with(".tgz") {
-                        DiffSource::TarGz(kitdiff::PathOrBlob::Path(source.clone().into()))
-                    } else {
-                        DiffSource::Zip(kitdiff::PathOrBlob::Path(source.clone().into()))
-                    }
-                }
+                // // Check if it's a GitHub artifact URL first
+                // if let Some((repo, artifact_id)) = parse_github_artifact_url(source) {
+                //     DiffSource::GHArtifact {
+                //         owner,
+                //         repo,
+                //         artifact_id,
+                //     }
+                // } else if source.starts_with("http://") || source.starts_with("https://") {
+                //     #[cfg(target_arch = "wasm32")]
+                //     {
+                //         if source.ends_with(".tar.gz") || source.ends_with(".tgz") {
+                //             DiffSource::TarGz(kitdiff::PathOrBlob::Url(source.clone(), None))
+                //         } else {
+                //             DiffSource::Zip(kitdiff::PathOrBlob::Url(source.clone(), None))
+                //         }
+                //     }
+                //     #[cfg(not(target_arch = "wasm32"))]
+                //     {
+                //         panic!(
+                //             "URL sources not supported on native platforms. Use 'gh-artifact' command for GitHub artifacts or download and provide a local file path."
+                //         );
+                //     }
+                // } else {
+                //     if source.ends_with(".tar.gz") || source.ends_with(".tgz") {
+                //         DiffSource::TarGz(kitdiff::PathOrBlob::Path(source.clone().into()))
+                //     } else {
+                //         DiffSource::Zip(kitdiff::PathOrBlob::Path(source.clone().into()))
+                //     }
+                // }
+                todo!()
             }
             Commands::GhArtifact { url } => {
-                if let Some((owner, repo, artifact_id)) = parse_github_artifact_url(url) {
-                    DiffSource::GHArtifact {
-                        owner,
-                        repo,
-                        artifact_id,
-                    }
-                } else {
-                    panic!("Invalid GitHub artifact URL: {}", url);
-                }
+                // if let Some((owner, repo, artifact_id)) = parse_github_artifact_url(url) {
+                //     DiffSource::GHArtifact {
+                //         owner,
+                //         repo,
+                //         artifact_id,
+                //     }
+                // } else {
+                //     panic!("Invalid GitHub artifact URL: {}", url);
+                // }
+                todo!()
             }
         }
     }

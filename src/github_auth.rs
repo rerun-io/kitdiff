@@ -3,13 +3,18 @@ use ehttp;
 use serde_json;
 use std::fmt;
 use std::sync::mpsc;
+use crate::github_model::GithubRepoLink;
 
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub enum GithubAuthCommand {
+    
+}
+
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AuthState {
     pub logged_in: Option<LoggedInState>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LoggedInState {
     pub access_token: String,
     pub provider_token: String, // GitHub OAuth token
@@ -73,7 +78,7 @@ fn get_current_timestamp() -> u64 {
 }
 
 // URL parsing utilities
-pub fn parse_github_artifact_url(url: &str) -> Option<(String, String, String)> {
+pub fn parse_github_artifact_url(url: &str) -> Option<(GithubRepoLink, String)> {
     // Expected format: github.com/owner/repo/actions/runs/12345/artifacts/67890
     let url = url
         .trim_start_matches("https://")
@@ -87,9 +92,10 @@ pub fn parse_github_artifact_url(url: &str) -> Option<(String, String, String)> 
         && parts[6] == "artifacts"
         && parts.len() >= 8
     {
+        let owner = parts[1].to_string();
+        let repo = parts[2].to_string();
         Some((
-            parts[1].to_string(), // owner
-            parts[2].to_string(), // repo
+            GithubRepoLink { owner, repo },
             parts[7].to_string(), // artifact_id
         ))
     } else {
