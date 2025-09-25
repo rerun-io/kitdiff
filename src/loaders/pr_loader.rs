@@ -1,8 +1,9 @@
 use crate::github_model::{GithubPrLink, GithubRepoLink};
-use crate::github_pr::{pr_ui, GithubPr};
+use crate::github_pr::{GithubPr, pr_ui};
 use crate::loaders::{LoadSnapshots, SnapshotLoader};
 use crate::octokit::RepoClient;
 use crate::snapshot::{FileReference, Snapshot};
+use crate::state::AppStateRef;
 use anyhow::Error;
 use eframe::egui::{Context, Ui};
 use egui_inbox::{UiInbox, UiInboxSender};
@@ -13,7 +14,6 @@ use std::ops::Deref;
 use std::path::Path;
 use std::pin::pin;
 use std::task::Poll;
-use crate::state::AppStateRef;
 
 pub struct PrLoader {
     snapshots: Vec<Snapshot>,
@@ -111,7 +111,10 @@ impl LoadSnapshots for PrLoader {
     fn update(&mut self, ctx: &Context) {
         for snapshot in self.inbox.read(ctx) {
             match snapshot {
-                Some(s) => self.snapshots.push(s),
+                Some(s) => {
+                    self.snapshots.push(s);
+                    self.snapshots.sort_by_key(|s| s.path.to_string_lossy().to_lowercase());
+                }
                 None => self.loading = false,
             }
         }

@@ -10,6 +10,8 @@ pub fn file_tree(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
 
     state.loader.extra_ui(ui, state.app);
 
+    ui.panel_title_bar("Files", None);
+
     let mut filter = state.filter.clone();
     TextEdit::singleline(&mut filter)
         .hint_text("Filter")
@@ -64,7 +66,7 @@ fn show_prefix(
         }
 
         if selected && state.index_just_selected {
-            response.scroll_to_me(Some(eframe::egui::Align::Center));
+            response.scroll_to_me(None);
         }
     }
 }

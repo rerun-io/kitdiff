@@ -9,7 +9,6 @@ use eframe::egui::{Context, Ui};
 
 pub fn viewer_ui(ctx: &Context, state: &ViewerAppStateRef<'_>) {
     egui::SidePanel::new(Side::Left, "files").show(ctx, |ui| {
-        ui.heading("Files");
         file_tree::file_tree(ui, state);
     });
 

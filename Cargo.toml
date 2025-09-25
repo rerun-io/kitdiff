@@ -37,6 +37,8 @@ futures = "0.3"
 re_ui = "0.26.0-alpha.1+dev"
 getrandom = { version = "0.3", features = ["wasm_js"] }
 anyhow = "1.0.99"
+graphql_client = "0.14.0"
+thiserror = "1.0.69"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

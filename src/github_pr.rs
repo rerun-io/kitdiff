@@ -1,12 +1,15 @@
 use crate::DiffSource;
 use eframe::egui;
-use eframe::egui::{Button, Context, Popup, Spinner};
+use eframe::egui::{Button, Context, Popup, ScrollArea, Spinner};
 use egui_inbox::UiInbox;
 use futures::stream::FuturesUnordered;
 use futures::{StreamExt, TryStreamExt};
-use octocrab::{AuthState, Error, Octocrab, Page};
+use graphql_client::GraphQLQuery;
+use octocrab::{AuthState, Octocrab, Page};
 use re_ui::egui_ext::boxed_widget::BoxedWidgetLocalExt;
-use std::collections::HashMap;
+use std::borrow::Cow;
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
 use std::future::ready;
 use std::pin::pin;
 use std::str::FromStr;
@@ -18,7 +21,7 @@ use crate::octokit::RepoClient;
 use crate::state::{AppStateRef, SystemCommand};
 use octocrab::models::commits::GithubCommitStatus;
 use octocrab::models::{
-    CombinedStatus, Status, StatusState,
+    CombinedStatus, RunId, Status,
     pulls::PullRequest,
     repos::RepoCommit,
     workflows::{Run, WorkflowListArtifact},
@@ -26,7 +29,23 @@ use octocrab::models::{
 use octocrab::params::repos::Reference;
 use octocrab::workflows::ListRunsBuilder;
 use re_ui::list_item::{LabelContent, ListItemContentButtonsExt, list_item_scope};
-use re_ui::{OnResponseExt, UiExt, icons};
+use re_ui::{OnResponseExt, SectionCollapsingHeader, UiExt, icons};
+// use chrono::DateTime;
+pub type GitObjectID = String;
+pub type DateTime = String;
+pub type URI = String;
+
+// The paths are relative to the directory where your `Cargo.toml` is located.
+// Both json and the GraphQL schema language are supported as sources for the schema
+#[derive(GraphQLQuery, Debug)]
+#[graphql(
+    schema_path = "github.graphql",
+    query_path = "src/github_pr.graphql",
+    response_derives = "Debug, Clone"
+)]
+pub struct PrDetailsQuery;
+use crate::github_pr::pr_details_query::StatusState;
+use anyhow::{Error, Result, anyhow};
 
 pub fn parse_github_pr_url(url: &str) -> Result<(String, String, u32), String> {
     // Parse URLs like: https://github.com/rerun-io/rerun/pull/11253
@@ -52,10 +71,10 @@ pub fn parse_github_pr_url(url: &str) -> Result<(String, String, u32), String> {
 
 #[derive(Debug)]
 pub enum GithubPrCommand {
-    FetchedData(Result<PrWithCommits, octocrab::Error>),
+    FetchedData(Result<PrWithCommits>),
     FetchedCommitArtifacts {
         sha: String,
-        artifacts: Result<Vec<ArtifactData>, octocrab::Error>,
+        artifacts: Result<Vec<WorkflowListArtifact>, Error>,
     },
     FetchCommitArtifacts {
         sha: String,
@@ -82,27 +101,30 @@ pub struct GithubArtifact {
 pub struct GithubPr {
     link: GithubPrLink,
     inbox: UiInbox<GithubPrCommand>,
-    pub data: Poll<Result<PrWithCommits, octocrab::Error>>,
+    pub data: Poll<Result<PrWithCommits, Error>>,
     client: Octocrab,
 }
 
 #[derive(Debug)]
 struct PrWithCommits {
-    pr: PullRequest,
-    commits: Vec<CommitWithArtifacts>,
+    title: String,
+    commits: Vec<CommitData>,
+    artifacts: HashMap<String, Poll<Result<Vec<WorkflowListArtifact>>>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum CommitState {
+    Pending,
+    Success,
+    Failure,
 }
 
 #[derive(Debug)]
-struct CommitWithArtifacts {
-    commit: RepoCommit,
-    status: CombinedStatus,
-    artifacts: Option<Poll<Result<Vec<ArtifactData>, octocrab::Error>>>,
-}
-
-#[derive(Debug, Clone)]
-struct ArtifactData {
-    artifact: WorkflowListArtifact,
-    run: Run,
+struct CommitData {
+    message: String,
+    sha: String,
+    status: CommitState,
+    workflow_run_ids: Vec<u64>,
 }
 
 impl GithubPr {
@@ -112,7 +134,7 @@ impl GithubPr {
         {
             let client = RepoClient::new(client.clone(), link.repo.clone());
             inbox.spawn(|tx| async move {
-                let details = get_all_pr_artifacts(&client, link.pr_number).await;
+                let details = get_pr_commits(&client, link.pr_number).await;
                 let _ = tx.send(GithubPrCommand::FetchedData(details));
             });
         }
@@ -133,127 +155,163 @@ impl GithubPr {
                 }
                 GithubPrCommand::FetchedCommitArtifacts { sha, artifacts } => {
                     if let Poll::Ready(Ok(pr_data)) = &mut self.data {
-                        for commit in &mut pr_data.commits {
-                            if commit.commit.sha == sha {
-                                commit.artifacts = Some(Poll::Ready(artifacts));
-                                break;
-                            }
-                        }
+                        pr_data.artifacts.insert(sha, Poll::Ready(artifacts));
                     }
                 }
-                GithubPrCommand::FetchCommitArtifacts { sha } => {
-                    match &mut self.data {
-                        Poll::Ready(Ok(pr_data)) => {
-                            for commit in &mut pr_data.commits {
-                                if commit.commit.sha == sha {
-                                    commit.artifacts = Some(Poll::Pending);
-                                    break;
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
+                GithubPrCommand::FetchCommitArtifacts { sha } => match &mut self.data {
+                    Poll::Ready(Ok(pr_data)) => match pr_data.artifacts.entry(sha.clone()) {
+                        Entry::Occupied(_) => {}
+                        Entry::Vacant(entry) => {
+                            entry.insert(Poll::Pending);
 
-                    let client = RepoClient::new(self.client.clone(), self.link.repo.clone());
-                    self.inbox.spawn(move |tx| async move {
-                        let artifacts = fetch_commit_artifacts(&client, &sha).await;
-                        let _ = tx.send(GithubPrCommand::FetchedCommitArtifacts { sha, artifacts });
-                    });
-                }
+                            let workflow_run_ids = pr_data
+                                .commits
+                                .iter()
+                                .find(|c| c.sha == sha)
+                                .map(|c| c.workflow_run_ids.clone())
+                                .unwrap_or_default();
+
+                            let client =
+                                RepoClient::new(self.client.clone(), self.link.repo.clone());
+                            self.inbox.spawn(move |tx| async move {
+                                let artifacts =
+                                    fetch_commit_artifacts(&client, workflow_run_ids).await;
+                                let _ = tx.send(GithubPrCommand::FetchedCommitArtifacts {
+                                    sha,
+                                    artifacts,
+                                });
+                            });
+                        }
+                    },
+                    _ => {}
+                },
             }
         }
     }
 }
 
-// Get all commits for a PR to get a complete picture
-async fn get_pr_commits(
-    repo: &RepoClient,
-    pr: PrNumber,
-) -> octocrab::Result<Vec<CommitWithArtifacts>> {
-    let page = repo.pulls().pr_commits(pr).send().await?;
-    let commits: Vec<_> = page
-        .into_stream(repo)
-        .map_ok(|commit| async move {
-            let status = repo
-                .get(
-                    format!(
-                        "/repos/{}/{}/commits/{}/status",
-                        repo.repo().owner,
-                        repo.repo().repo,
-                        commit.sha
-                    ),
-                    None::<&()>,
-                )
-                .await?;
-            Ok(CommitWithArtifacts {
-                commit,
-                status,
-                artifacts: None,
-            })
-        })
-        .try_buffered(10)
-        .try_collect()
+async fn get_pr_commits(repo: &RepoClient, pr: PrNumber) -> Result<PrWithCommits> {
+    let response: graphql_client::Response<pr_details_query::ResponseData> = repo
+        .graphql(&PrDetailsQuery::build_query(pr_details_query::Variables {
+            owner: repo.repo().owner.clone(),
+            repo: repo.repo().repo.clone(),
+            oid: pr as _,
+        }))
         .await?;
 
-    Ok(commits)
-}
+    let response = response
+        .data
+        .ok_or_else(|| anyhow!("No data in response"))?
+        .repository
+        .ok_or_else(|| anyhow!("Repository not found"))?
+        .pull_request
+        .ok_or_else(|| anyhow!("Pull request not found"))?;
 
-async fn get_all_pr_artifacts(
-    repo: &RepoClient,
-    pr_number: PrNumber,
-) -> octocrab::Result<PrWithCommits> {
-    let pr = repo.pulls().get(pr_number).await?;
-    let commits = get_pr_commits(repo, pr_number).await?;
+    let mut data = PrWithCommits {
+        title: response.title,
+        commits: Vec::new(),
+        artifacts: HashMap::new(),
+    };
 
-    Ok(PrWithCommits { pr, commits })
-}
+    for commit in response
+        .commits
+        .nodes
+        .ok_or_else(|| anyhow!("No commits found"))?
+    {
+        if let Some(commit) = commit {
+            let commit = commit.commit;
+            let sha = commit.oid;
+            let message = commit.message_headline;
 
-#[derive(serde::Serialize)]
-struct ListWorkflowRunsHeadSha {
-    head_sha: String,
+            let mut status = CommitState::Success;
+            let mut workflow_run_ids = HashSet::new();
+
+            // Unfortunately github has no easy way to get the status for a commit, best thing seems to be
+            // to query all check suites and group them by workflow.
+            let mut last_suite_per_workflow = HashMap::new();
+
+            if let Some(suites) = commit.check_suites {
+                if let Some(nodes) = suites.nodes {
+                    for node in nodes {
+                        if let Some(node) = node {
+                            if let Some(workflow_run) = node.workflow_run.clone() {
+                                last_suite_per_workflow.insert(workflow_run.workflow.id, node);
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (workflow_id, suite) in last_suite_per_workflow {
+                let pending = match suite.status {
+                    pr_details_query::CheckStatusState::COMPLETED => false,
+                    pr_details_query::CheckStatusState::IN_PROGRESS => true,
+                    pr_details_query::CheckStatusState::PENDING => true,
+                    pr_details_query::CheckStatusState::QUEUED => true,
+                    pr_details_query::CheckStatusState::REQUESTED => true,
+                    pr_details_query::CheckStatusState::WAITING => true,
+                    pr_details_query::CheckStatusState::Other(_) => false,
+                };
+                let error = if let Some(conclusion) = suite.conclusion {
+                    match conclusion {
+                        pr_details_query::CheckConclusionState::ACTION_REQUIRED => true,
+                        pr_details_query::CheckConclusionState::CANCELLED => true,
+                        pr_details_query::CheckConclusionState::FAILURE => true,
+                        pr_details_query::CheckConclusionState::NEUTRAL => false,
+                        pr_details_query::CheckConclusionState::SKIPPED => false,
+                        pr_details_query::CheckConclusionState::STALE => false,
+                        pr_details_query::CheckConclusionState::STARTUP_FAILURE => true,
+                        pr_details_query::CheckConclusionState::SUCCESS => false,
+                        pr_details_query::CheckConclusionState::TIMED_OUT => true,
+                        pr_details_query::CheckConclusionState::Other(_) => true,
+                    }
+                } else {
+                    false
+                };
+                if error {
+                    status = CommitState::Failure
+                } else if pending && status != CommitState::Failure {
+                    status = CommitState::Pending
+                }
+
+                if let Some(run) = suite.workflow_run {
+                    if let Some(db_id) = run.database_id {
+                        workflow_run_ids.insert(db_id as u64);
+                    }
+                }
+            }
+
+            data.commits.push(CommitData {
+                message,
+                sha,
+                status: status,
+                workflow_run_ids: workflow_run_ids.into_iter().collect(),
+            });
+        }
+    }
+
+    Ok(data)
 }
 
 async fn fetch_commit_artifacts(
     repo: &RepoClient,
-    sha: &str,
-) -> octocrab::Result<Vec<ArtifactData>> {
-    
-    let workflow_runs: Page<Run> = repo
-        .get(
-            // Unfortunately octocrab is missing the head_sha filter
-            format!(
-                "/repos/{}/{}/actions/runs",
-                repo.repo().owner,
-                repo.repo().repo
-            ),
-            Some(&ListWorkflowRunsHeadSha {
-                head_sha: sha.to_string(),
-            }),
-        )
-        .await?;
-
-    let runs: Vec<Run> = workflow_runs.into_stream(repo).try_collect().await?;
-
-    let artifacts = FuturesUnordered::from_iter(runs.into_iter().map(|run| async move {
+    run_ids: Vec<u64>,
+) -> Result<Vec<WorkflowListArtifact>> {
+    let artifacts = FuturesUnordered::from_iter(run_ids.into_iter().map(|run| async move {
         let artifacts_page = repo
             .actions()
-            .list_workflow_run_artifacts(&repo.repo().owner, &repo.repo().repo, run.id)
+            .list_workflow_run_artifacts(&repo.repo().owner, &repo.repo().repo, RunId(run))
             .send()
             .await?
             .value
             .expect("No etag was provided, so we should have a value");
 
-        let stream = artifacts_page
-            .into_stream(repo)
-            .map_ok(move |artifact| ArtifactData {
-                artifact,
-                run: run.clone(),
-            });
+        let stream = artifacts_page.into_stream(repo);
 
         Ok(stream)
     }))
     .try_flatten()
-    .try_collect::<Vec<ArtifactData>>()
+    .try_collect::<Vec<WorkflowListArtifact>>()
     .await?;
 
     Ok(artifacts)
@@ -262,108 +320,85 @@ async fn fetch_commit_artifacts(
 pub fn pr_ui(ui: &mut egui::Ui, state: &AppStateRef<'_>, pr: &GithubPr) {
     let mut selected_source = None;
 
-    ui.group(|ui| {
-        ui.heading(format!("GitHub PR #{}", pr.link.pr_number));
+    match &pr.data {
+        Poll::Ready(Ok(data)) => {
+            list_item_scope(ui, "pr_info", |ui| {
+                SectionCollapsingHeader::new(format!("PR: {}", data.title)).show(ui, |ui| {
+                    ui.set_max_height(100.0);
+                    ScrollArea::vertical().show(ui, |ui| {
+                        for commit in data.commits.iter().rev() {
+                            let item = ui.list_item();
 
-        match &pr.data {
-            Poll::Ready(Ok(data)) => {
-                let details = &data.pr;
+                            let button = match &commit.status {
+                                CommitState::Failure => Button::image(
+                                    icons::ERROR.as_image().tint(ui.tokens().alert_error.icon),
+                                )
+                                .boxed_local(),
+                                CommitState::Pending => Spinner::new().boxed_local(),
+                                CommitState::Success => Button::image(
+                                    icons::SUCCESS
+                                        .as_image()
+                                        .tint(ui.tokens().alert_success.icon),
+                                )
+                                .boxed_local(),
+                                _ => Button::image(icons::HELP.as_image()).boxed_local(),
+                            };
 
-                if let Some(title) = &details.title {
-                    ui.label(title);
-                }
-
-                ui.separator();
-
-                if let Some(html_url) = &details.html_url {
-                    if ui.button("Compare PR Branches").clicked() {
-                        selected_source =
-                            Some(DiffSource::Pr(html_url.to_string().parse().unwrap()));
-                    }
-                }
-
-                ui.separator();
-                ui.heading("Recent Commits & Artifacts");
-
-                ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
-
-                list_item_scope(ui, "pr_info", |ui| {
-                    for commit in data.commits.iter().rev() {
-                        let item = ui.list_item();
-
-                        let button = match &commit.status.state {
-                            StatusState::Failure | StatusState::Error => Button::image(
-                                icons::ERROR.as_image().tint(ui.tokens().alert_error.icon),
-                            )
-                            .boxed_local(),
-                            StatusState::Pending => Spinner::new().boxed_local(),
-                            StatusState::Success => Button::image(
-                                icons::SUCCESS
-                                    .as_image()
-                                    .tint(ui.tokens().alert_success.icon),
-                            )
-                            .boxed_local(),
-                            _ => Button::image(icons::HELP.as_image()).boxed_local(),
-                        };
-
-                        let button = button.on_menu(|ui| {
-                            ui.set_min_width(250.0);
-                            match &commit.artifacts {
-                                None => {
-                                    pr.inbox
-                                        .sender()
-                                        .send(GithubPrCommand::FetchCommitArtifacts {
-                                            sha: commit.commit.sha.clone(),
-                                        })
-                                        .ok();
-                                }
-                                Some(Poll::Pending) => {
-                                    ui.spinner();
-                                }
-                                Some(Poll::Ready(Err(error))) => {
-                                    ui.colored_label(
-                                        ui.visuals().error_fg_color,
-                                        format!("Error: {}", error),
-                                    );
-                                }
-                                Some(Poll::Ready(Ok(artifacts))) => {
-                                    if artifacts.is_empty() {
-                                        ui.label("No artifacts found");
-                                    } else {
-                                        for artifact in artifacts {
-                                            // let label = format!(
-                                            //     "{} (from run: {})",
-                                            //     artifact.artifact.name, artifact.run.name
-                                            // );
-
-                                            if ui.button(&artifact.artifact.name).clicked() {
-                                                selected_source = Some(DiffSource::GHArtifact {
-                                                    repo: pr.link.repo.clone(),
-                                                    artifact_id: artifact.artifact.id.to_string(),
-                                                });
+                            let button = button.on_menu(|ui| {
+                                ui.set_min_width(250.0);
+                                match data.artifacts.get(&commit.sha) {
+                                    None => {
+                                        pr.inbox
+                                            .sender()
+                                            .send(GithubPrCommand::FetchCommitArtifacts {
+                                                sha: commit.sha.clone(),
+                                            })
+                                            .ok();
+                                    }
+                                    Some(Poll::Pending) => {
+                                        ui.spinner();
+                                    }
+                                    Some(Poll::Ready(Err(error))) => {
+                                        ui.colored_label(
+                                            ui.visuals().error_fg_color,
+                                            format!("Error: {}", error),
+                                        );
+                                    }
+                                    Some(Poll::Ready(Ok(artifacts))) => {
+                                        if artifacts.is_empty() {
+                                            ui.label("No artifacts found");
+                                        } else {
+                                            for artifact in artifacts {
+                                                if ui.button(&artifact.name).clicked() {
+                                                    selected_source =
+                                                        Some(DiffSource::GHArtifact {
+                                                            repo: pr.link.repo.clone(),
+                                                            artifact_id: artifact.id.to_string(),
+                                                        });
+                                                }
                                             }
                                         }
                                     }
                                 }
-                            }
-                        });
+                            });
 
-                        let content = LabelContent::new(&commit.commit.commit.message)
-                            .with_button(button)
-                            .with_always_show_buttons(true);
+                            let content = LabelContent::new(&commit.message)
+                                .with_button(button)
+                                .with_always_show_buttons(true);
 
-                        let response = item.show_hierarchical(ui, content);
-                    }
+                            item.show_hierarchical(ui, content);
+                        }
+                    });
                 });
-            }
-            Poll::Ready(Err(error)) => {
-                ui.colored_label(ui.visuals().error_fg_color, format!("Error: {}", error));
-            }
-            Poll::Pending => {
-                ui.spinner();
-            }
+            });
         }
-    });
+        Poll::Ready(Err(error)) => {
+            ui.colored_label(ui.visuals().error_fg_color, format!("Error: {}", error));
+        }
+        Poll::Pending => {
+            ui.spinner();
+        }
+    }
 
     if let Some(source) = selected_source {
         state.send(SystemCommand::Open(source));
