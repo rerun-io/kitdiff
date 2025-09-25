@@ -73,7 +73,7 @@ pub enum GithubPrCommand {
     FetchedData(Result<PrWithCommits>),
     FetchedCommitArtifacts {
         sha: String,
-        artifacts: Result<Vec<WorkflowListArtifact>, Error>,
+        artifacts: Result<Vec<ArtifactData>, Error>,
     },
     FetchCommitArtifacts {
         sha: String,
@@ -107,8 +107,16 @@ pub struct GithubPr {
 #[derive(Debug)]
 struct PrWithCommits {
     title: String,
+    head_branch: String,
+    base_branch: String,
     commits: Vec<CommitData>,
-    artifacts: HashMap<String, Poll<Result<Vec<WorkflowListArtifact>>>>,
+    artifacts: HashMap<String, Poll<Result<Vec<ArtifactData>>>>,
+}
+
+#[derive(Debug)]
+struct ArtifactData {
+    data: WorkflowListArtifact,
+    run_id: RunId,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -208,6 +216,8 @@ async fn get_pr_commits(repo: &RepoClient, pr: PrNumber) -> Result<PrWithCommits
 
     let mut data = PrWithCommits {
         title: response.title,
+        head_branch: response.head_ref_name,
+        base_branch: response.base_ref_name,
         commits: Vec::new(),
         artifacts: HashMap::new(),
     };
@@ -292,10 +302,7 @@ async fn get_pr_commits(repo: &RepoClient, pr: PrNumber) -> Result<PrWithCommits
     Ok(data)
 }
 
-async fn fetch_commit_artifacts(
-    repo: &RepoClient,
-    run_ids: Vec<u64>,
-) -> Result<Vec<WorkflowListArtifact>> {
+async fn fetch_commit_artifacts(repo: &RepoClient, run_ids: Vec<u64>) -> Result<Vec<ArtifactData>> {
     let artifacts = FuturesUnordered::from_iter(run_ids.into_iter().map(|run| async move {
         let artifacts_page = repo
             .actions()
@@ -305,12 +312,17 @@ async fn fetch_commit_artifacts(
             .value
             .expect("No etag was provided, so we should have a value");
 
-        let stream = artifacts_page.into_stream(repo);
+        let stream = artifacts_page
+            .into_stream(repo)
+            .map_ok(move |artifact| ArtifactData {
+                data: artifact,
+                run_id: RunId(run),
+            });
 
         Ok(stream)
     }))
     .try_flatten()
-    .try_collect::<Vec<WorkflowListArtifact>>()
+    .try_collect::<Vec<ArtifactData>>()
     .await?;
 
     Ok(artifacts)
@@ -367,12 +379,14 @@ pub fn pr_ui(ui: &mut egui::Ui, state: &AppStateRef<'_>, pr: &GithubPr) {
                                         ui.label("No artifacts found");
                                     } else {
                                         for artifact in artifacts {
-                                            if ui.button(&artifact.name).clicked() {
+                                            if ui.button(&artifact.data.name).clicked() {
                                                 selected_source = Some(DiffSource::GHArtifact(
                                                     GithubArtifactLink {
                                                         repo: pr.link.repo.clone(),
-                                                        artifact_id: artifact.id,
-                                                        name: Some(artifact.name.clone()),
+                                                        artifact_id: artifact.data.id,
+                                                        name: Some(artifact.data.name.clone()),
+                                                        branch_name: Some(data.head_branch.clone()),
+                                                        run_id: Some(artifact.run_id),
                                                     },
                                                 ));
                                             }

@@ -6,6 +6,7 @@ use eframe::NativeOptions;
 use kitdiff::DiffSource;
 use kitdiff::app::App;
 use octocrab::models::ArtifactId;
+use kitdiff::config::Config;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
@@ -57,6 +58,8 @@ fn parse_url_query_params() -> Option<DiffSource> {
                                 repo,
                                 artifact_id: ArtifactId(artifact_id.parse().unwrap()),
                                 name: None,
+                                branch_name: None,
+                                run_id: None,
                             }));
                         }
 
@@ -103,7 +106,7 @@ fn main() {
             .start(
                 canvas,
                 web_options,
-                Box::new(move |cc| Ok(Box::new(App::new(cc, diff_source)))),
+                Box::new(move |cc| Ok(Box::new(App::new(cc, diff_source, Config::default())))),
             )
             .await;
 

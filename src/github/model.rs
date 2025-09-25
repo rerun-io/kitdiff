@@ -1,6 +1,6 @@
 use std::fmt::Display;
 use std::str::FromStr;
-use octocrab::models::ArtifactId;
+use octocrab::models::{ArtifactId, RunId};
 
 pub type PrNumber = u64;
 
@@ -91,6 +91,8 @@ pub struct GithubArtifactLink {
     pub repo: GithubRepoLink,
     pub artifact_id: ArtifactId,
     pub name: Option<String>,
+    pub branch_name: Option<String>,
+    pub run_id: Option<RunId>,
 }
 
 impl GithubArtifactLink {

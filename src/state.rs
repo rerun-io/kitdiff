@@ -6,6 +6,7 @@ use eframe::egui;
 use eframe::egui::Context;
 use egui_inbox::UiInboxSender;
 use std::ops::Deref;
+use crate::config::Config;
 use crate::github::auth::{GitHubAuth, GithubAuthCommand};
 use crate::github::model::GithubPrLink;
 use crate::github::pr::GithubPr;
@@ -14,6 +15,7 @@ pub struct AppState {
     pub github_auth: GitHubAuth,
     pub github_pr: Option<GithubPr>,
     pub settings: Settings,
+    pub config: Config,
     pub page: Page,
 }
 
@@ -67,11 +69,12 @@ impl ViewFilter {
 }
 
 impl AppState {
-    pub fn new(settings: Settings) -> AppState {
+    pub fn new(settings: Settings, config: Config) -> AppState {
         Self {
             github_auth: GitHubAuth::new(settings.auth.clone()),
             github_pr: None,
             settings,
+            config,
             page: Page::Home,
         }
     }

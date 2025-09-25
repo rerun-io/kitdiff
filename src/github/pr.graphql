@@ -2,6 +2,8 @@ query PrDetailsQuery($owner: String!, $repo: String!, $oid: Int!) {
     repository(owner: $owner, name: $repo) {
         pullRequest(number: $oid) {
             title
+            headRefName
+            baseRefName
 
             commits(last: 100) {
                 nodes {

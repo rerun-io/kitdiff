@@ -12,6 +12,7 @@ use eframe::{Frame, Storage, egui};
 use egui_extras::install_image_loaders;
 use egui_inbox::UiInbox;
 use std::sync::{Arc, mpsc};
+use crate::config::Config;
 
 pub struct App {
     diff_loader: Arc<DiffImageLoader>,
@@ -20,7 +21,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(cc: &eframe::CreationContext, source: Option<DiffSource>) -> Self {
+    pub fn new(cc: &eframe::CreationContext, source: Option<DiffSource>, config: Config) -> Self {
         re_ui::apply_style_and_install_loaders(&cc.egui_ctx);
 
         let settings: Settings = cc
@@ -28,7 +29,7 @@ impl App {
             .and_then(|s| eframe::get_value(s, eframe::APP_KEY))
             .unwrap_or_default();
 
-        let state = AppState::new(settings);
+        let state = AppState::new(settings, config);
 
         install_image_loaders(&cc.egui_ctx);
         let diff_loader = Arc::new(DiffImageLoader::default());

@@ -1,19 +1,27 @@
+use crate::github::model::GithubArtifactLink;
 use crate::loaders::LoadSnapshots;
 use crate::loaders::archive_loader::ArchiveLoader;
 use crate::snapshot::Snapshot;
+use crate::state::AppStateRef;
 use anyhow::Error;
 use bytes::Bytes;
-use eframe::egui::Context;
+use eframe::egui::{Context, Ui};
 use egui_inbox::UiInbox;
 use futures::SinkExt;
 use octocrab::Octocrab;
 use octocrab::models::ArtifactId;
 use octocrab::params::actions::ArchiveFormat;
 use std::task::Poll;
-use crate::github::model::GithubArtifactLink;
+use serde_json::json;
+
+pub struct GHArtifactLoader {
+    state: LoaderState,
+    artifact: GithubArtifactLink,
+    inbox: UiInbox<()>,
+}
 
 #[derive(Debug)]
-pub enum GHArtifactLoader {
+pub enum LoaderState {
     LoadingData(UiInbox<anyhow::Result<(Bytes, String)>>),
     LoadingArchive(ArchiveLoader),
     Error(anyhow::Error),
@@ -23,11 +31,18 @@ impl GHArtifactLoader {
     pub fn new(client: Octocrab, artifact: GithubArtifactLink) -> Self {
         let mut inbox = UiInbox::new();
 
-        inbox.spawn(move |tx| async move {
-            tx.send(download_artifact(&client, &artifact).await).ok();
-        });
+        {
+            let artifact = artifact.clone();
+            inbox.spawn(move |tx| async move {
+                tx.send(download_artifact(&client, &artifact).await).ok();
+            });
+        }
 
-        Self::LoadingData(inbox)
+        Self {
+            state: LoaderState::LoadingData(inbox),
+            artifact,
+            inbox: UiInbox::new(),
+        }
     }
 }
 
@@ -51,51 +66,81 @@ pub async fn download_artifact(
 impl LoadSnapshots for GHArtifactLoader {
     fn update(&mut self, ctx: &Context) {
         let mut new_self = None;
-        match self {
-            GHArtifactLoader::LoadingData(inbox) => {
+        match &mut self.state {
+            LoaderState::LoadingData(inbox) => {
                 if let Some(result) = inbox.read(ctx).last() {
                     match result {
                         Ok((data, name)) => {
-                            new_self = Some(GHArtifactLoader::LoadingArchive(ArchiveLoader::new(
+                            new_self = Some(LoaderState::LoadingArchive(ArchiveLoader::new(
                                 crate::loaders::DataReference::Data(data.clone(), name),
                             )));
                         }
                         Err(e) => {
-                            new_self = Some(GHArtifactLoader::Error(e));
+                            new_self = Some(LoaderState::Error(e));
                         }
                     }
                 }
             }
-            GHArtifactLoader::LoadingArchive(loader) => {
+            LoaderState::LoadingArchive(loader) => {
                 loader.update(ctx);
             }
-            GHArtifactLoader::Error(_) => {}
+            LoaderState::Error(_) => {}
         }
         if let Some(new_self) = new_self {
-            *self = new_self;
+            self.state = new_self;
         }
     }
 
     fn snapshots(&self) -> &[Snapshot] {
-        match self {
-            GHArtifactLoader::LoadingArchive(loader) => loader.snapshots(),
+        match &self.state {
+            LoaderState::LoadingArchive(loader) => loader.snapshots(),
             _ => &[],
         }
     }
 
     fn state(&self) -> Poll<Result<(), &Error>> {
-        match self {
-            GHArtifactLoader::LoadingData(_) => Poll::Pending,
-            GHArtifactLoader::LoadingArchive(loader) => loader.state(),
-            GHArtifactLoader::Error(e) => Poll::Ready(Err(e)),
+        match &self.state {
+            LoaderState::LoadingData(_) => Poll::Pending,
+            LoaderState::LoadingArchive(loader) => loader.state(),
+            LoaderState::Error(e) => Poll::Ready(Err(e)),
         }
     }
 
     fn files_header(&self) -> String {
-        match self {
-            GHArtifactLoader::LoadingData(_) => "Github Artifact".to_string(),
-            GHArtifactLoader::LoadingArchive(loader) => loader.files_header(),
-            GHArtifactLoader::Error(_) => "Github Artifact".to_string(),
+        match &self.state {
+            LoaderState::LoadingData(_) => "Github Artifact".to_string(),
+            LoaderState::LoadingArchive(loader) => loader.files_header(),
+            LoaderState::Error(_) => "Github Artifact".to_string(),
+        }
+    }
+
+    fn extra_ui(&self, ui: &mut Ui, state: &AppStateRef<'_>) {
+        if let Some((git_ref, run_id)) = self.artifact.branch_name.clone().zip(self.artifact.run_id) {
+            let response = ui
+                .button("Update snapshots from this archive")
+                .on_hover_text(
+                    "This will create a commit on the PR branch with the updated snapshots.",
+                );
+            if response.clicked() {
+                let client = state.github_auth.client();
+                let artifact = self.artifact.clone();
+                hello_egui_utils::spawn(async move {
+                    client
+                        .actions()
+                        .create_workflow_dispatch(
+                            artifact.repo.owner,
+                            artifact.repo.repo,
+                            "update_kittest_snapshots.yml",
+                            git_ref,
+                        )
+                        .inputs(json!({
+                            "artifact_id": artifact.artifact_id.to_string(),
+                            "run_id": run_id.to_string(),
+                        }))
+                        .send()
+                        .await;
+                });
+            }
         }
     }
 }

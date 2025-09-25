@@ -18,6 +18,7 @@ mod viewer;
 mod home;
 mod bar;
 pub mod github;
+pub mod config;
 
 #[derive(Debug, Clone)]
 pub enum DiffSource {

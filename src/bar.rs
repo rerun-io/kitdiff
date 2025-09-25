@@ -1,7 +1,7 @@
 use crate::state::{AppStateRef, SystemCommand};
 use eframe::egui;
 use eframe::egui::panel::TopBottomSide;
-use eframe::egui::{Context, Ui};
+use eframe::egui::{Context, Popup, Ui};
 use crate::github::auth::GithubAuthCommand;
 
 pub fn bar(ctx: &Context, state: &AppStateRef<'_>) {
@@ -18,7 +18,13 @@ pub fn auth_ui(ui: &mut Ui, state: &AppStateRef<'_>) {
             if let Some(image) = &logged_in.user_image {
                 ui.image(image);
             }
-            ui.label(&logged_in.username);
+            let response = ui.button(&logged_in.username);
+
+            Popup::menu(&response).show(|ui| {
+                if ui.button("Log out").clicked() {
+                    state.send(GithubAuthCommand::Logout);
+                }
+            });
         }
         None => {
             if ui.button("Log in with GitHub").clicked() {

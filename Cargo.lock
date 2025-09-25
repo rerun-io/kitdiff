@@ -3130,6 +3130,7 @@ dependencies = [
  "getrandom 0.3.3",
  "git2",
  "graphql_client",
+ "hello_egui_utils",
  "ignore",
  "image",
  "js-sys",
