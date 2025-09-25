@@ -6,7 +6,7 @@ use eframe::egui::load::Bytes;
 use std::any::Any;
 use std::path::PathBuf;
 use std::sync::mpsc::Sender;
-use crate::github_model::{GithubPrLink, GithubRepoLink};
+use crate::github_model::{GithubArtifactLink, GithubPrLink, GithubRepoLink};
 use crate::state::AppState;
 
 pub mod app;
@@ -34,10 +34,7 @@ pub enum DiffSource {
     Pr(GithubPrLink),
     Zip(PathOrBlob),
     TarGz(PathOrBlob),
-    GHArtifact {
-        repo: GithubRepoLink,
-        artifact_id: String,
-    },
+    GHArtifact(GithubArtifactLink),
 }
 
 impl DiffSource {
@@ -58,19 +55,13 @@ impl DiffSource {
             //     None
             // }
             DiffSource::Pr(url) => {
-                // #[cfg(not(target_arch = "wasm32"))]
-                // {
-                //     native_loaders::git_loader::pr_git_discovery(url, tx, ctx)
-                //         .expect("Failed to run PR git discovery");
-                // }
-                // #[cfg(target_arch = "wasm32")]
-                // {
-                //     eprintln!(
-                //         "PR git discovery not supported on WASM. Use GitHub artifacts instead."
-                //     );
-                // }
-                // None
                 Box::new(loaders::pr_loader::PrLoader::new(url, state.github_auth.client()))
+            }
+            DiffSource::GHArtifact(artifact) => {
+                Box::new(loaders::gh_archive_loader::GHArtifactLoader::new(
+                    state.github_auth.client(),
+                    artifact,
+                ))
             }
             // DiffSource::Zip(data) => {
             //     #[cfg(target_arch = "wasm32")]

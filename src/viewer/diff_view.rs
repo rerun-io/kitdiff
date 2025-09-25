@@ -78,10 +78,5 @@ pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
                 }
             }
         }
-    } else if state.loader.state().is_pending() {
-        // TODO: Display error
-        ui.label("Searching for snapshots...");
-    } else {
-        ui.label("No snapshots found.");
     }
 }

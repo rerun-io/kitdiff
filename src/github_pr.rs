@@ -16,7 +16,7 @@ use std::str::FromStr;
 use std::sync::mpsc;
 use std::task::Poll;
 // Import octocrab models
-use crate::github_model::{GithubPrLink, PrNumber};
+use crate::github_model::{GithubArtifactLink, GithubPrLink, PrNumber};
 use crate::octokit::RepoClient;
 use crate::state::{AppStateRef, SystemCommand};
 use octocrab::models::commits::GithubCommitStatus;
@@ -370,11 +370,13 @@ pub fn pr_ui(ui: &mut egui::Ui, state: &AppStateRef<'_>, pr: &GithubPr) {
                                         } else {
                                             for artifact in artifacts {
                                                 if ui.button(&artifact.name).clicked() {
-                                                    selected_source =
-                                                        Some(DiffSource::GHArtifact {
+                                                    selected_source = Some(DiffSource::GHArtifact(
+                                                        GithubArtifactLink {
                                                             repo: pr.link.repo.clone(),
-                                                            artifact_id: artifact.id.to_string(),
-                                                        });
+                                                            artifact_id: artifact.id,
+                                                            name: Some(artifact.name.clone()),
+                                                        },
+                                                    ));
                                                 }
                                             }
                                         }

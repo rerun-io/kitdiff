@@ -1,5 +1,6 @@
 use std::fmt::Display;
 use std::str::FromStr;
+use octocrab::models::ArtifactId;
 
 pub type PrNumber = u64;
 
@@ -84,3 +85,21 @@ impl Display for GithubPrLink {
         )
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct GithubArtifactLink {
+    pub repo: GithubRepoLink,
+    pub artifact_id: ArtifactId,
+    pub name: Option<String>,
+}
+
+impl GithubArtifactLink {
+    pub fn name(&self) -> String {
+        self.name
+            .as_deref()
+            .unwrap_or(&self.artifact_id.to_string())
+            .to_string()
+    }
+}
+
+

@@ -78,6 +78,10 @@ impl LoadSnapshots for FileLoader {
             Poll::Ready(Ok(()))
         }
     }
+
+    fn files_header(&self) -> String {
+        format!("Files in {}", self.base_path.display())
+    }
 }
 
 fn try_create_snapshot(png_path: &Path, base_path: &Path) -> Option<Snapshot> {
@@ -111,7 +115,7 @@ fn try_create_snapshot(png_path: &Path, base_path: &Path) -> Option<Snapshot> {
             path: relative_path.to_path_buf(),
             old: Some(FileReference::Path(old_path)),
             new: Some(FileReference::Path(png_path.to_path_buf())),
-            diff: Some(diff_path),
+            diff: Some(FileReference::Path(diff_path)),
         })
     } else if new_path.exists() {
         // new.png exists, use original as old and new.png as new
@@ -119,7 +123,7 @@ fn try_create_snapshot(png_path: &Path, base_path: &Path) -> Option<Snapshot> {
             path: relative_path.to_path_buf(),
             old: Some(FileReference::Path(png_path.to_path_buf())),
             new: Some(FileReference::Path(new_path)),
-            diff: Some(diff_path),
+            diff: Some(FileReference::Path(diff_path)),
         })
     } else {
         // No old or new variant, skip this snapshot

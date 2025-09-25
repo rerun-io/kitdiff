@@ -1,16 +1,30 @@
 use crate::state::{FilteredSnapshot, ViewerAppStateRef, ViewerSystemCommand};
+use anyhow::Error;
 use eframe::egui;
-use eframe::egui::{Id, ScrollArea, TextEdit, Ui};
-use re_ui::UiExt;
+use eframe::egui::{Id, ScrollArea, TextEdit, Ui, Widget};
 use re_ui::list_item::{LabelContent, ListItem};
+use re_ui::{UiExt, icons};
 use std::collections::BTreeMap;
+use std::task::Poll;
 
 pub fn file_tree(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
     ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
 
     state.loader.extra_ui(ui, state.app);
 
-    ui.panel_title_bar("Files", None);
+    ui.panel_title_bar_with_buttons(&state.loader.files_header(), None, |ui| match state.loader.state() {
+        Poll::Ready(Ok(())) => {}
+        Poll::Ready(Err(e)) => {
+            icons::ERROR
+                .as_image()
+                .tint(ui.tokens().alert_error.icon)
+                .ui(ui)
+                .on_hover_text(e.to_string());
+        }
+        Poll::Pending => {
+            ui.spinner();
+        }
+    });
 
     let mut filter = state.filter.clone();
     TextEdit::singleline(&mut filter)
@@ -44,6 +58,14 @@ pub fn file_tree(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
                 } else {
                     show_prefix(ui, state, &snapshots);
                 }
+            }
+
+            if state.loader.snapshots().is_empty() {
+                if state.loader.state().is_ready() {
+                    ui.label("No snapshots were found.");
+                }
+            } else if state.filtered_snapshots.is_empty() {
+                ui.label("No snapshots match the filter.");
             }
         });
     });

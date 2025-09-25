@@ -113,7 +113,8 @@ impl LoadSnapshots for PrLoader {
             match snapshot {
                 Some(s) => {
                     self.snapshots.push(s);
-                    self.snapshots.sort_by_key(|s| s.path.to_string_lossy().to_lowercase());
+                    self.snapshots
+                        .sort_by_key(|s| s.path.to_string_lossy().to_lowercase());
                 }
                 None => self.loading = false,
             }
@@ -135,5 +136,9 @@ impl LoadSnapshots for PrLoader {
 
     fn extra_ui(&self, ui: &mut Ui, state: &AppStateRef<'_>) {
         pr_ui(ui, state, &self.pr_info);
+    }
+
+    fn files_header(&self) -> String {
+        format!("{}", self.link)
     }
 }

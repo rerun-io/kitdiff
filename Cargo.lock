@@ -3116,6 +3116,7 @@ name = "kitdiff"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bytes",
  "chrono",
  "clap",
  "dify",
@@ -3135,6 +3136,7 @@ dependencies = [
  "octocrab",
  "octocrab-wasm",
  "re_ui",
+ "reqwest",
  "serde",
  "serde_json",
  "tar",

@@ -1,6 +1,7 @@
 use crate::diff_image_loader;
 use crate::diff_image_loader::DiffOptions;
 use crate::state::{AppStateRef, PageRef, ViewerStateRef};
+use eframe::egui;
 use eframe::egui::{Color32, ImageSource};
 use std::path::PathBuf;
 
@@ -11,7 +12,7 @@ pub struct Snapshot {
     pub old: Option<FileReference>,
     /// If only new is set, the file was added.
     pub new: Option<FileReference>,
-    pub diff: Option<PathBuf>,
+    pub diff: Option<FileReference>,
 }
 
 #[derive(Debug, Clone)]
@@ -57,10 +58,20 @@ impl Snapshot {
         self.new.as_ref().map(|p| p.to_uri())
     }
 
+    pub fn register_bytes(&self, ctx: &egui::Context) {
+        if let Some(FileReference::Source(ImageSource::Bytes { bytes, uri })) = &self.old {
+            ctx.include_bytes(uri.clone(), bytes.clone());
+        }
+        if let Some(FileReference::Source(ImageSource::Bytes { bytes, uri })) = &self.new {
+            ctx.include_bytes(uri.clone(), bytes.clone());
+        }
+        if let Some(FileReference::Source(ImageSource::Bytes { bytes, uri })) = &self.diff {
+            ctx.include_bytes(uri.clone(), bytes.clone());
+        }
+    }
+
     pub fn file_diff_uri(&self) -> Option<String> {
-        self.diff
-            .as_ref()
-            .map(|p| format!("file://{}", p.display()))
+        self.diff.as_ref().map(|p| p.to_uri())
     }
 
     pub fn diff_uri(&self, use_file_if_available: bool, options: DiffOptions) -> Option<String> {
