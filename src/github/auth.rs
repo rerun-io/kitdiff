@@ -1,20 +1,34 @@
+use crate::state::SystemCommand;
 use eframe::egui;
 use ehttp;
 use serde_json;
 use std::fmt;
 use std::sync::mpsc;
+use crate::github::model::GithubRepoLink;
 
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub enum GithubAuthCommand {
+    Login,
+    Logout,
+}
+
+impl From<GithubAuthCommand> for SystemCommand {
+    fn from(cmd: GithubAuthCommand) -> Self {
+        SystemCommand::GithubAuth(cmd)
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AuthState {
     pub logged_in: Option<LoggedInState>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LoggedInState {
-    pub access_token: String,
-    pub provider_token: String, // GitHub OAuth token
+    pub supabase_token: String,
+    pub github_token: String, // GitHub OAuth token
     expires_at: u64,
-    username: String,
+    pub username: String,
+    pub user_image: Option<String>,
 }
 
 #[derive(Debug)]
@@ -24,6 +38,26 @@ pub struct GitHubAuth {
     state: AuthState,
     auth_sender: AuthSender,
     auth_receiver: AuthReceiver,
+}
+
+impl GitHubAuth {
+    fn make_client(token: Option<&str>) -> octocrab::Octocrab {
+        let builder = octocrab_wasm::builder();
+
+        let mut client = builder.build().expect("Failed to build Octocrab client");
+
+        if let Some(token) = token {
+            client = client
+                .user_access_token(token.to_string())
+                .expect("Invalid token");
+        }
+
+        client
+    }
+
+    pub fn client(&self) -> octocrab::Octocrab {
+        Self::make_client(self.get_token())
+    }
 }
 
 #[derive(Debug)]
@@ -73,7 +107,7 @@ fn get_current_timestamp() -> u64 {
 }
 
 // URL parsing utilities
-pub fn parse_github_artifact_url(url: &str) -> Option<(String, String, String)> {
+pub fn parse_github_artifact_url(url: &str) -> Option<(GithubRepoLink, String)> {
     // Expected format: github.com/owner/repo/actions/runs/12345/artifacts/67890
     let url = url
         .trim_start_matches("https://")
@@ -87,9 +121,10 @@ pub fn parse_github_artifact_url(url: &str) -> Option<(String, String, String)> 
         && parts[6] == "artifacts"
         && parts.len() >= 8
     {
+        let owner = parts[1].to_string();
+        let repo = parts[2].to_string();
         Some((
-            parts[1].to_string(), // owner
-            parts[2].to_string(), // repo
+            GithubRepoLink { owner, repo },
             parts[7].to_string(), // artifact_id
         ))
     } else {
@@ -112,12 +147,27 @@ impl GitHubAuth {
 
         let (auth_sender, auth_receiver) = mpsc::channel();
 
-        Self {
+        let mut this = Self {
             supabase_url,
             supabase_anon_key,
             state,
             auth_sender,
             auth_receiver,
+        };
+
+        this.check_for_auth_callback();
+
+        this
+    }
+
+    pub fn handle(&mut self, cmd: GithubAuthCommand) {
+        match cmd {
+            GithubAuthCommand::Login => {
+                self.login_github();
+            }
+            GithubAuthCommand::Logout => {
+                self.logout();
+            }
         }
     }
 
@@ -161,10 +211,11 @@ impl GitHubAuth {
                                         let expires_at = get_current_timestamp() + (24 * 60 * 60); // 24 hours
 
                                         let logged_in_state = LoggedInState {
-                                            access_token: access_token.clone(),
-                                            provider_token: github_token,
+                                            supabase_token: access_token.clone(),
+                                            github_token: github_token,
                                             expires_at,
                                             username,
+                                            user_image: None, // Could fetch user image if needed
                                         };
                                         let auth_state = AuthState {
                                             logged_in: Some(logged_in_state),
@@ -271,7 +322,7 @@ impl GitHubAuth {
             self.state
                 .logged_in
                 .as_ref()
-                .map(|s| s.provider_token.as_str())
+                .map(|s| s.github_token.as_str())
         } else {
             None
         }

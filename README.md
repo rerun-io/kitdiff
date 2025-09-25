@@ -1,4 +1,4 @@
-# kitdiff, a visual diffing tool
+# kitdiff 📸🐱, a visual diffing tool
 
 I got frustrated with the experience of reviewing image snapshot changes (from egui_kittest, thus the name) in my ide and on github, so I made something really cool:
 

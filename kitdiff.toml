@@ -1,0 +1,2 @@
+[github]
+update_snapshot_workflow_name = "update_kittest_snapshots.yml"

@@ -1,195 +1,191 @@
-use crate::github_auth::{AuthState, LoggedInState};
-use crate::snapshot::Snapshot;
+use crate::loaders::SnapshotLoader;
 use eframe::egui::Context;
 use eframe::egui::load::Bytes;
 use std::any::Any;
-use std::sync::mpsc::Sender;
+use std::path::PathBuf;
+use crate::github::model::{GithubArtifactLink, GithubPrLink};
+use crate::state::AppState;
 
 pub mod app;
 pub mod diff_image_loader;
-pub mod github_auth;
-pub mod github_pr;
 pub mod loaders;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod native_loaders;
+mod settings;
 pub mod snapshot;
+mod state;
+mod viewer;
+mod home;
+mod bar;
+pub mod github;
+pub mod config;
 
 #[derive(Debug, Clone)]
 pub enum DiffSource {
     #[cfg(not(target_arch = "wasm32"))]
-    Files,
+    Files(PathBuf),
     #[cfg(not(target_arch = "wasm32"))]
     Git,
-    Pr(String),        // Store the PR URL
-    Zip(PathOrBlob),   // Store the zip source (URL or file path)
-    TarGz(PathOrBlob), // Tar.gz files loaded via drag and drop
-    GHArtifact {
-        owner: String,
-        repo: String,
-        artifact_id: String,
-    }, // GitHub artifact
+    Pr(GithubPrLink),
+    GHArtifact(GithubArtifactLink),
+    Zip(PathOrBlob),
+    TarGz(PathOrBlob),
 }
 
 impl DiffSource {
     pub fn load(
         self,
-        tx: Sender<Snapshot>,
         ctx: Context,
-        auth: Option<&LoggedInState>,
-    ) -> Option<DropMeLater> {
+        state: &AppState,
+    ) -> SnapshotLoader {
         match self {
             #[cfg(not(target_arch = "wasm32"))]
-            DiffSource::Files => {
-                native_loaders::file_diff::file_discovery(".", tx, ctx);
-                None
+            DiffSource::Files(path) => {
+                Box::new(native_loaders::file_loader::FileLoader::new(path))
             }
-            #[cfg(not(target_arch = "wasm32"))]
-            DiffSource::Git => {
-                native_loaders::git_loader::git_discovery(tx, ctx)
-                    .expect("Failed to run git discovery");
-                None
-            }
+            // #[cfg(not(target_arch = "wasm32"))]
+            // DiffSource::Git => {
+            //     native_loaders::git_loader::git_discovery(tx, ctx)
+            //         .expect("Failed to run git discovery");
+            //     None
+            // }
             DiffSource::Pr(url) => {
-                #[cfg(not(target_arch = "wasm32"))]
-                {
-                    native_loaders::git_loader::pr_git_discovery(url, tx, ctx)
-                        .expect("Failed to run PR git discovery");
-                }
-                #[cfg(target_arch = "wasm32")]
-                {
-                    eprintln!(
-                        "PR git discovery not supported on WASM. Use GitHub artifacts instead."
-                    );
-                }
-                None
+                Box::new(loaders::pr_loader::PrLoader::new(url, state.github_auth.client()))
             }
-            DiffSource::Zip(data) => {
-                #[cfg(target_arch = "wasm32")]
-                {
-                    // For URLs in wasm, spawn async task
-                    if matches!(data, PathOrBlob::Url(_, _)) {
-                        let data_clone = data.clone();
-                        let tx_clone = tx.clone();
-                        let ctx_clone = ctx.clone();
-
-                        wasm_bindgen_futures::spawn_local(async move {
-                            if let Some(bytes) = data_clone.load_bytes_async().await {
-                                if let Err(e) = loaders::zip_loader::extract_and_discover_zip(
-                                    bytes.to_vec(),
-                                    tx_clone,
-                                    ctx_clone,
-                                ) {
-                                    eprintln!("Failed to run zip discovery: {:?}", e);
-                                }
-                            }
-                        });
-                        None
-                    } else {
-                        // For blobs, use sync method
-                        loaders::zip_loader::extract_and_discover_zip(
-                            data.load_bytes()?.to_vec(),
-                            tx,
-                            ctx,
-                        )
-                        .expect("Failed to run zip discovery");
-                        None
-                    }
-                }
-                #[cfg(not(target_arch = "wasm32"))]
-                {
-                    loaders::zip_loader::extract_and_discover_zip(
-                        data.load_bytes()?.to_vec(),
-                        tx,
-                        ctx,
-                    )
-                    .expect("Failed to run zip discovery");
-                    None
-                }
+            DiffSource::GHArtifact(artifact) => {
+                Box::new(loaders::gh_archive_loader::GHArtifactLoader::new(
+                    state.github_auth.client(),
+                    artifact,
+                ))
             }
-            DiffSource::TarGz(data) => {
-                #[cfg(target_arch = "wasm32")]
-                {
-                    // For URLs in wasm, spawn async task
-                    if matches!(data, PathOrBlob::Url(_, _)) {
-                        let data_clone = data.clone();
-                        let tx_clone = tx.clone();
-                        let ctx_clone = ctx.clone();
-
-                        wasm_bindgen_futures::spawn_local(async move {
-                            if let Some(bytes) = data_clone.load_bytes_async().await {
-                                if let Err(e) = loaders::tar_loader::extract_and_discover_tar_gz(
-                                    bytes.to_vec(),
-                                    tx_clone,
-                                    ctx_clone,
-                                ) {
-                                    eprintln!("Failed to run tar.gz discovery: {:?}", e);
-                                }
-                            }
-                        });
-                        None
-                    } else {
-                        // For blobs, use sync method
-                        loaders::tar_loader::extract_and_discover_tar_gz(
-                            data.load_bytes()?.to_vec(),
-                            tx,
-                            ctx,
-                        )
-                        .expect("Failed to run tar.gz discovery");
-                        None
-                    }
-                }
-                #[cfg(not(target_arch = "wasm32"))]
-                {
-                    loaders::tar_loader::extract_and_discover_tar_gz(
-                        data.load_bytes()?.to_vec(),
-                        tx,
-                        ctx,
-                    )
-                    .expect("Failed to run tar.gz discovery");
-                    None
-                }
-            }
-            DiffSource::GHArtifact {
-                owner,
-                repo,
-                artifact_id,
-            } => {
-                #[cfg(target_arch = "wasm32")]
-                {
-                    use crate::github_auth::github_artifact_api_url;
-
-                    // Create GitHub API URL for artifact
-                    let api_url = github_artifact_api_url(&owner, &repo, &artifact_id);
-
-                    // TODO: Get GitHub token from auth state - we'll need to pass this context
-                    // For now, try without token (works for public repos)
-                    let data = PathOrBlob::Url(api_url, auth.map(|l| l.provider_token.clone()));
-
-                    // Use async zip loading since it's a URL
-                    let tx_clone = tx.clone();
-                    let ctx_clone = ctx.clone();
-
-                    wasm_bindgen_futures::spawn_local(async move {
-                        if let Some(bytes) = data.load_bytes_async().await {
-                            if let Err(e) = loaders::zip_loader::extract_and_discover_zip(
-                                bytes.to_vec(),
-                                tx_clone,
-                                ctx_clone,
-                            ) {
-                                eprintln!("Failed to run GitHub artifact zip discovery: {:?}", e);
-                            }
-                        }
-                    });
-                    None
-                }
-                #[cfg(not(target_arch = "wasm32"))]
-                {
-                    eprintln!(
-                        "GitHub artifact loading not supported on native platforms yet. Please download the artifact manually and use the zip command instead."
-                    );
-                    None
-                }
-            }
+            // DiffSource::Zip(data) => {
+            //     #[cfg(target_arch = "wasm32")]
+            //     {
+            //         // For URLs in wasm, spawn async task
+            //         if matches!(data, PathOrBlob::Url(_, _)) {
+            //             let data_clone = data.clone();
+            //             let tx_clone = tx.clone();
+            //             let ctx_clone = ctx.clone();
+            //
+            //             wasm_bindgen_futures::spawn_local(async move {
+            //                 if let Some(bytes) = data_clone.load_bytes_async().await {
+            //                     if let Err(e) = loaders::zip_loader::extract_and_discover_zip(
+            //                         bytes.to_vec(),
+            //                         tx_clone,
+            //                         ctx_clone,
+            //                     ) {
+            //                         eprintln!("Failed to run zip discovery: {:?}", e);
+            //                     }
+            //                 }
+            //             });
+            //             None
+            //         } else {
+            //             // For blobs, use sync method
+            //             loaders::zip_loader::extract_and_discover_zip(
+            //                 data.load_bytes()?.to_vec(),
+            //                 tx,
+            //                 ctx,
+            //             )
+            //             .expect("Failed to run zip discovery");
+            //             None
+            //         }
+            //     }
+            //     #[cfg(not(target_arch = "wasm32"))]
+            //     {
+            //         loaders::zip_loader::extract_and_discover_zip(
+            //             data.load_bytes()?.to_vec(),
+            //             tx,
+            //             ctx,
+            //         )
+            //         .expect("Failed to run zip discovery");
+            //         None
+            //     }
+            // }
+            // DiffSource::TarGz(data) => {
+            //     #[cfg(target_arch = "wasm32")]
+            //     {
+            //         // For URLs in wasm, spawn async task
+            //         if matches!(data, PathOrBlob::Url(_, _)) {
+            //             let data_clone = data.clone();
+            //             let tx_clone = tx.clone();
+            //             let ctx_clone = ctx.clone();
+            //
+            //             wasm_bindgen_futures::spawn_local(async move {
+            //                 if let Some(bytes) = data_clone.load_bytes_async().await {
+            //                     if let Err(e) = loaders::tar_loader::extract_and_discover_tar_gz(
+            //                         bytes.to_vec(),
+            //                         tx_clone,
+            //                         ctx_clone,
+            //                     ) {
+            //                         eprintln!("Failed to run tar.gz discovery: {:?}", e);
+            //                     }
+            //                 }
+            //             });
+            //             None
+            //         } else {
+            //             // For blobs, use sync method
+            //             loaders::tar_loader::extract_and_discover_tar_gz(
+            //                 data.load_bytes()?.to_vec(),
+            //                 tx,
+            //                 ctx,
+            //             )
+            //             .expect("Failed to run tar.gz discovery");
+            //             None
+            //         }
+            //     }
+            //     #[cfg(not(target_arch = "wasm32"))]
+            //     {
+            //         loaders::tar_loader::extract_and_discover_tar_gz(
+            //             data.load_bytes()?.to_vec(),
+            //             tx,
+            //             ctx,
+            //         )
+            //         .expect("Failed to run tar.gz discovery");
+            //         None
+            //     }
+            // }
+            // DiffSource::GHArtifact {
+            //     owner,
+            //     repo,
+            //     artifact_id,
+            // } => {
+            //     #[cfg(target_arch = "wasm32")]
+            //     {
+            //         use crate::github_auth::github_artifact_api_url;
+            //
+            //         // Create GitHub API URL for artifact
+            //         let api_url = github_artifact_api_url(&owner, &repo, &artifact_id);
+            //
+            //         // TODO: Get GitHub token from auth state - we'll need to pass this context
+            //         // For now, try without token (works for public repos)
+            //         let data = PathOrBlob::Url(api_url, auth.map(|l| l.provider_token.clone()));
+            //
+            //         // Use async zip loading since it's a URL
+            //         let tx_clone = tx.clone();
+            //         let ctx_clone = ctx.clone();
+            //
+            //         wasm_bindgen_futures::spawn_local(async move {
+            //             if let Some(bytes) = data.load_bytes_async().await {
+            //                 if let Err(e) = loaders::zip_loader::extract_and_discover_zip(
+            //                     bytes.to_vec(),
+            //                     tx_clone,
+            //                     ctx_clone,
+            //                 ) {
+            //                     eprintln!("Failed to run GitHub artifact zip discovery: {:?}", e);
+            //                 }
+            //             }
+            //         });
+            //         None
+            //     }
+            //     #[cfg(not(target_arch = "wasm32"))]
+            //     {
+            //         eprintln!(
+            //             "GitHub artifact loading not supported on native platforms yet. Please download the artifact manually and use the zip command instead."
+            //         );
+            //         None
+            //     }
+            // }
+            _ => todo!()
         }
     }
 }

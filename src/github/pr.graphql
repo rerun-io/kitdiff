@@ -1,0 +1,43 @@
+query PrDetailsQuery($owner: String!, $repo: String!, $oid: Int!) {
+    repository(owner: $owner, name: $repo) {
+        pullRequest(number: $oid) {
+            title
+            headRefName
+            baseRefName
+
+            commits(last: 100) {
+                nodes {
+                    commit {
+                        oid
+                        messageHeadline
+                        committedDate
+                        status {
+                            state
+                        }
+
+                        # Check the latest check suites instead
+                        checkSuites(last: 100, filterBy: {
+                            appId: 15368 # GitHub Actions
+                        }) {
+                            nodes {
+                                workflowRun {
+                                    workflow {
+                                        name
+                                        id
+                                    }
+                                    databaseId
+                                }
+                                conclusion
+                                status
+                                url
+                                app {
+                                    name
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
