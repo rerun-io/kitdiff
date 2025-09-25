@@ -1,4 +1,3 @@
-use crate::github_model::GithubArtifactLink;
 use crate::loaders::LoadSnapshots;
 use crate::loaders::archive_loader::ArchiveLoader;
 use crate::snapshot::Snapshot;
@@ -11,6 +10,7 @@ use octocrab::Octocrab;
 use octocrab::models::ArtifactId;
 use octocrab::params::actions::ArchiveFormat;
 use std::task::Poll;
+use crate::github::model::GithubArtifactLink;
 
 #[derive(Debug)]
 pub enum GHArtifactLoader {

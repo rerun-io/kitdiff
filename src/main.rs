@@ -5,7 +5,6 @@ mod cli;
 use eframe::NativeOptions;
 use kitdiff::DiffSource;
 use kitdiff::app::App;
-use kitdiff::github_model::{GithubArtifactLink, GithubPrLink};
 use octocrab::models::ArtifactId;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -33,8 +32,8 @@ fn main() -> eframe::Result<()> {
 
 #[cfg(target_arch = "wasm32")]
 fn parse_url_query_params() -> Option<DiffSource> {
-    use kitdiff::github_auth::parse_github_artifact_url;
-    use kitdiff::github_pr::parse_github_pr_url;
+    use kitdiff::github::auth::parse_github_artifact_url;
+    use kitdiff::github::pr::parse_github_pr_url;
 
     if let Some(window) = web_sys::window() {
         if let Ok(search) = window.location().search() {
@@ -54,7 +53,7 @@ fn parse_url_query_params() -> Option<DiffSource> {
 
                         // Try to parse as GitHub artifact URL
                         if let Some((repo, artifact_id)) = parse_github_artifact_url(&decoded_url) {
-                            return Some(DiffSource::GHArtifact(GithubArtifactLink {
+                            return Some(DiffSource::GHArtifact(kitdiff::github::model::GithubArtifactLink {
                                 repo,
                                 artifact_id: ArtifactId(artifact_id.parse().unwrap()),
                                 name: None,

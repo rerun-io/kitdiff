@@ -1,8 +1,8 @@
 use clap::{Parser, Subcommand};
 use kitdiff::DiffSource;
-use kitdiff::github_auth::parse_github_artifact_url;
-use kitdiff::github_model::GithubArtifactLink;
 use octocrab::models::ArtifactId;
+use kitdiff::github::auth::parse_github_artifact_url;
+use kitdiff::github::model::GithubArtifactLink;
 
 #[derive(Parser)]
 #[command(name = "kitdiff")]

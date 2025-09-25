@@ -1,7 +1,5 @@
-use crate::github_model::{GithubPrLink, GithubRepoLink};
-use crate::github_pr::{GithubPr, pr_ui};
 use crate::loaders::{LoadSnapshots, SnapshotLoader};
-use crate::octokit::RepoClient;
+use crate::github::octokit::RepoClient;
 use crate::snapshot::{FileReference, Snapshot};
 use crate::state::AppStateRef;
 use anyhow::Error;
@@ -14,6 +12,8 @@ use std::ops::Deref;
 use std::path::Path;
 use std::pin::pin;
 use std::task::Poll;
+use crate::github::model::{GithubPrLink, GithubRepoLink};
+use crate::github::pr::{pr_ui, GithubPr};
 
 pub struct PrLoader {
     snapshots: Vec<Snapshot>,

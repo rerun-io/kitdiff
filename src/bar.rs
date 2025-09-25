@@ -1,8 +1,8 @@
-use crate::github_auth::{AuthState, GithubAuthCommand, LoggedInState};
 use crate::state::{AppStateRef, SystemCommand};
 use eframe::egui;
 use eframe::egui::panel::TopBottomSide;
 use eframe::egui::{Context, Ui};
+use crate::github::auth::GithubAuthCommand;
 
 pub fn bar(ctx: &Context, state: &AppStateRef<'_>) {
     egui::TopBottomPanel::top("top bar")

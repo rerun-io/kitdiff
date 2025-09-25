@@ -1,29 +1,23 @@
-use crate::github_auth::{AuthState, LoggedInState};
 use crate::loaders::SnapshotLoader;
-use crate::snapshot::Snapshot;
 use eframe::egui::Context;
 use eframe::egui::load::Bytes;
 use std::any::Any;
 use std::path::PathBuf;
-use std::sync::mpsc::Sender;
-use crate::github_model::{GithubArtifactLink, GithubPrLink, GithubRepoLink};
+use crate::github::model::{GithubArtifactLink, GithubPrLink};
 use crate::state::AppState;
 
 pub mod app;
 pub mod diff_image_loader;
-pub mod github_auth;
-pub mod github_pr;
 pub mod loaders;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod native_loaders;
 mod settings;
 pub mod snapshot;
 mod state;
-pub mod github_model;
-mod octokit;
 mod viewer;
 mod home;
 mod bar;
+pub mod github;
 
 #[derive(Debug, Clone)]
 pub enum DiffSource {
@@ -32,9 +26,9 @@ pub enum DiffSource {
     #[cfg(not(target_arch = "wasm32"))]
     Git,
     Pr(GithubPrLink),
+    GHArtifact(GithubArtifactLink),
     Zip(PathOrBlob),
     TarGz(PathOrBlob),
-    GHArtifact(GithubArtifactLink),
 }
 
 impl DiffSource {

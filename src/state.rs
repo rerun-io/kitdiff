@@ -1,7 +1,4 @@
 use crate::diff_image_loader::DiffImageLoader;
-use crate::github_auth::{GitHubAuth, GithubAuthCommand};
-use crate::github_model::GithubPrLink;
-use crate::github_pr::GithubPr;
 use crate::loaders::SnapshotLoader;
 use crate::settings::Settings;
 use crate::snapshot::Snapshot;
@@ -9,6 +6,9 @@ use eframe::egui;
 use eframe::egui::Context;
 use egui_inbox::UiInboxSender;
 use std::ops::Deref;
+use crate::github::auth::{GitHubAuth, GithubAuthCommand};
+use crate::github::model::GithubPrLink;
+use crate::github::pr::GithubPr;
 
 pub struct AppState {
     pub github_auth: GitHubAuth,

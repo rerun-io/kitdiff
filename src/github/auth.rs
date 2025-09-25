@@ -1,10 +1,10 @@
-use crate::github_model::GithubRepoLink;
 use crate::state::SystemCommand;
 use eframe::egui;
 use ehttp;
 use serde_json;
 use std::fmt;
 use std::sync::mpsc;
+use crate::github::model::GithubRepoLink;
 
 pub enum GithubAuthCommand {
     Login,

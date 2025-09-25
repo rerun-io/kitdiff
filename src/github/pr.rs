@@ -16,8 +16,7 @@ use std::str::FromStr;
 use std::sync::mpsc;
 use std::task::Poll;
 // Import octocrab models
-use crate::github_model::{GithubArtifactLink, GithubPrLink, PrNumber};
-use crate::octokit::RepoClient;
+use crate::github::octokit::RepoClient;
 use crate::state::{AppStateRef, SystemCommand};
 use octocrab::models::commits::GithubCommitStatus;
 use octocrab::models::{
@@ -40,11 +39,11 @@ pub type URI = String;
 #[derive(GraphQLQuery, Debug)]
 #[graphql(
     schema_path = "github.graphql",
-    query_path = "src/github_pr.graphql",
+    query_path = "src/github/pr.graphql",
     response_derives = "Debug, Clone"
 )]
 pub struct PrDetailsQuery;
-use crate::github_pr::pr_details_query::StatusState;
+use crate::github::model::{GithubArtifactLink, GithubPrLink, PrNumber};
 use anyhow::{Error, Result, anyhow};
 
 pub fn parse_github_pr_url(url: &str) -> Result<(String, String, u32), String> {
@@ -320,77 +319,75 @@ async fn fetch_commit_artifacts(
 pub fn pr_ui(ui: &mut egui::Ui, state: &AppStateRef<'_>, pr: &GithubPr) {
     let mut selected_source = None;
 
-    match &pr.data {
+    list_item_scope(ui, "pr_info", |ui| match &pr.data {
         Poll::Ready(Ok(data)) => {
-            list_item_scope(ui, "pr_info", |ui| {
-                SectionCollapsingHeader::new(format!("PR: {}", data.title)).show(ui, |ui| {
-                    ui.set_max_height(100.0);
-                    ScrollArea::vertical().show(ui, |ui| {
-                        for commit in data.commits.iter().rev() {
-                            let item = ui.list_item();
+            SectionCollapsingHeader::new(format!("PR: {}", data.title)).show(ui, |ui| {
+                ui.set_max_height(100.0);
+                ScrollArea::vertical().show(ui, |ui| {
+                    for commit in data.commits.iter().rev() {
+                        let item = ui.list_item();
 
-                            let button = match &commit.status {
-                                CommitState::Failure => Button::image(
-                                    icons::ERROR.as_image().tint(ui.tokens().alert_error.icon),
-                                )
-                                .boxed_local(),
-                                CommitState::Pending => Spinner::new().boxed_local(),
-                                CommitState::Success => Button::image(
-                                    icons::SUCCESS
-                                        .as_image()
-                                        .tint(ui.tokens().alert_success.icon),
-                                )
-                                .boxed_local(),
-                                _ => Button::image(icons::HELP.as_image()).boxed_local(),
-                            };
+                        let button = match &commit.status {
+                            CommitState::Failure => Button::image(
+                                icons::ERROR.as_image().tint(ui.tokens().alert_error.icon),
+                            )
+                            .boxed_local(),
+                            CommitState::Pending => Spinner::new().boxed_local(),
+                            CommitState::Success => Button::image(
+                                icons::SUCCESS
+                                    .as_image()
+                                    .tint(ui.tokens().alert_success.icon),
+                            )
+                            .boxed_local(),
+                            _ => Button::image(icons::HELP.as_image()).boxed_local(),
+                        };
 
-                            let button = button.on_menu(|ui| {
-                                ui.set_min_width(250.0);
-                                match data.artifacts.get(&commit.sha) {
-                                    None => {
-                                        pr.inbox
-                                            .sender()
-                                            .send(GithubPrCommand::FetchCommitArtifacts {
-                                                sha: commit.sha.clone(),
-                                            })
-                                            .ok();
-                                    }
-                                    Some(Poll::Pending) => {
-                                        ui.spinner();
-                                    }
-                                    Some(Poll::Ready(Err(error))) => {
-                                        ui.colored_label(
-                                            ui.visuals().error_fg_color,
-                                            format!("Error: {}", error),
-                                        );
-                                    }
-                                    Some(Poll::Ready(Ok(artifacts))) => {
-                                        if artifacts.is_empty() {
-                                            ui.label("No artifacts found");
-                                        } else {
-                                            for artifact in artifacts {
-                                                if ui.button(&artifact.name).clicked() {
-                                                    selected_source = Some(DiffSource::GHArtifact(
-                                                        GithubArtifactLink {
-                                                            repo: pr.link.repo.clone(),
-                                                            artifact_id: artifact.id,
-                                                            name: Some(artifact.name.clone()),
-                                                        },
-                                                    ));
-                                                }
+                        let button = button.on_menu(|ui| {
+                            ui.set_min_width(250.0);
+                            match data.artifacts.get(&commit.sha) {
+                                None => {
+                                    pr.inbox
+                                        .sender()
+                                        .send(GithubPrCommand::FetchCommitArtifacts {
+                                            sha: commit.sha.clone(),
+                                        })
+                                        .ok();
+                                }
+                                Some(Poll::Pending) => {
+                                    ui.spinner();
+                                }
+                                Some(Poll::Ready(Err(error))) => {
+                                    ui.colored_label(
+                                        ui.visuals().error_fg_color,
+                                        format!("Error: {}", error),
+                                    );
+                                }
+                                Some(Poll::Ready(Ok(artifacts))) => {
+                                    if artifacts.is_empty() {
+                                        ui.label("No artifacts found");
+                                    } else {
+                                        for artifact in artifacts {
+                                            if ui.button(&artifact.name).clicked() {
+                                                selected_source = Some(DiffSource::GHArtifact(
+                                                    GithubArtifactLink {
+                                                        repo: pr.link.repo.clone(),
+                                                        artifact_id: artifact.id,
+                                                        name: Some(artifact.name.clone()),
+                                                    },
+                                                ));
                                             }
                                         }
                                     }
                                 }
-                            });
+                            }
+                        });
 
-                            let content = LabelContent::new(&commit.message)
-                                .with_button(button)
-                                .with_always_show_buttons(true);
+                        let content = LabelContent::new(&commit.message)
+                            .with_button(button)
+                            .with_always_show_buttons(true);
 
-                            item.show_hierarchical(ui, content);
-                        }
-                    });
+                        item.show_hierarchical(ui, content);
+                    }
                 });
             });
         }
@@ -398,9 +395,12 @@ pub fn pr_ui(ui: &mut egui::Ui, state: &AppStateRef<'_>, pr: &GithubPr) {
             ui.colored_label(ui.visuals().error_fg_color, format!("Error: {}", error));
         }
         Poll::Pending => {
+            SectionCollapsingHeader::new(format!("PR: {}", pr.link))
+                .with_button(Spinner::new())
+                .show(ui, |ui| {});
             ui.spinner();
         }
-    }
+    });
 
     if let Some(source) = selected_source {
         state.send(SystemCommand::Open(source));

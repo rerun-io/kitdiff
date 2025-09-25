@@ -1,8 +1,4 @@
 use crate::diff_image_loader::{DiffImageLoader, DiffOptions};
-use crate::github_auth::{AuthState, LoggedInState};
-#[cfg(target_arch = "wasm32")]
-use crate::github_auth::{GitHubAuth, github_artifact_api_url, parse_github_artifact_url};
-use crate::github_pr::{GithubPr, parse_github_pr_url};
 use crate::settings::Settings;
 use crate::snapshot::{FileReference, Snapshot};
 use crate::state::{AppState, AppStateRef, PageRef, SystemCommand, ViewerSystemCommand};
