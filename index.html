@@ -135,3 +135,11 @@
 </html>
 
 <!-- Powered by egui: https://github.com/emilk/egui/ -->
+<script>
+    // The service worker seems to really mess up caching, lets remove it for now.
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+        for (const registration of registrations) {
+            registration.unregister();
+        }
+    });
+</script>
