@@ -1,9 +1,8 @@
 use crate::state::{FilteredSnapshot, ViewerAppStateRef, ViewerSystemCommand};
-use anyhow::Error;
 use eframe::egui;
-use eframe::egui::{Id, ScrollArea, TextEdit, Ui, Widget};
-use re_ui::list_item::{LabelContent, ListItem};
-use re_ui::{UiExt, icons};
+use eframe::egui::{Id, ScrollArea, TextEdit, Ui, Widget as _};
+use re_ui::list_item::LabelContent;
+use re_ui::{UiExt as _, icons};
 use std::collections::BTreeMap;
 use std::task::Poll;
 
@@ -12,17 +11,19 @@ pub fn file_tree(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
 
     state.loader.extra_ui(ui, state.app);
 
-    ui.panel_title_bar_with_buttons(&state.loader.files_header(), None, |ui| match state.loader.state() {
-        Poll::Ready(Ok(())) => {}
-        Poll::Ready(Err(e)) => {
-            icons::ERROR
-                .as_image()
-                .tint(ui.tokens().alert_error.icon)
-                .ui(ui)
-                .on_hover_text(e.to_string());
-        }
-        Poll::Pending => {
-            ui.spinner();
+    ui.panel_title_bar_with_buttons(&state.loader.files_header(), None, |ui| {
+        match state.loader.state() {
+            Poll::Ready(Ok(())) => {}
+            Poll::Ready(Err(e)) => {
+                icons::ERROR
+                    .as_image()
+                    .tint(ui.tokens().alert_error.icon)
+                    .ui(ui)
+                    .on_hover_text(e.to_string());
+            }
+            Poll::Pending => {
+                ui.spinner();
+            }
         }
     });
 
@@ -43,7 +44,7 @@ pub fn file_tree(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
                 let prefix = snapshot.path.parent().and_then(|p| p.to_str());
                 tree.entry(prefix)
                     .or_insert(vec![])
-                    .push((*snapshot_index, *snapshot))
+                    .push((*snapshot_index, *snapshot));
             }
 
             for (prefix, snapshots) in tree {

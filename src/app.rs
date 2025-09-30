@@ -1,18 +1,13 @@
-use crate::diff_image_loader::{DiffImageLoader, DiffOptions};
+use crate::config::Config;
+use crate::diff_image_loader::DiffImageLoader;
 use crate::settings::Settings;
-use crate::snapshot::{FileReference, Snapshot};
 use crate::state::{AppState, AppStateRef, PageRef, SystemCommand, ViewerSystemCommand};
-use crate::{DiffSource, PathOrBlob, home, viewer, bar};
-use eframe::egui::panel::Side;
-use eframe::egui::{
-    Align, Context, Image, ImageSource, Key, Modifiers, RichText, ScrollArea, SizeHint, Slider,
-    TextEdit, TextureFilter, TextureOptions,
-};
+use crate::{DiffSource, bar, home, viewer};
+use eframe::egui::{Context, Key, Modifiers};
 use eframe::{Frame, Storage, egui};
 use egui_extras::install_image_loaders;
 use egui_inbox::UiInbox;
-use std::sync::{Arc, mpsc};
-use crate::config::Config;
+use std::sync::Arc;
 
 pub struct App {
     diff_loader: Arc<DiffImageLoader>,
@@ -101,7 +96,7 @@ impl eframe::App for App {
                 }
             }
 
-            Self::end_frame(ctx, &state_ref)
+            Self::end_frame(ctx, &state_ref);
         }
 
         // for file in &ctx.input(|i| i.raw.dropped_files.clone()) {
@@ -198,7 +193,6 @@ impl App {
                 if let Some(new_index) = new_index {
                     state.send(ViewerSystemCommand::SelectSnapshot(new_index));
                 }
-
 
                 let handle_key = |key: Key, toggle: &mut bool| {
                     if ctx.input_mut(|i| i.key_pressed(key)) {

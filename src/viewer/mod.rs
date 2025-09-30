@@ -2,10 +2,10 @@ mod diff_view;
 mod file_tree;
 mod viewer_options;
 
-use crate::state::{AppStateRef, ViewerAppStateRef};
+use crate::state::ViewerAppStateRef;
 use eframe::egui;
+use eframe::egui::Context;
 use eframe::egui::panel::Side;
-use eframe::egui::{Context, Ui};
 
 pub fn viewer_ui(ctx: &Context, state: &ViewerAppStateRef<'_>) {
     egui::SidePanel::new(Side::Left, "files").show(ctx, |ui| {

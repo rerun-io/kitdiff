@@ -6,7 +6,6 @@ use eframe::NativeOptions;
 use kitdiff::DiffSource;
 use kitdiff::app::App;
 use kitdiff::config::Config;
-use octocrab::models::ArtifactId;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
@@ -16,7 +15,7 @@ fn main() -> eframe::Result<()> {
         .expect("Failed to create Tokio runtime");
     let _guard = rt.enter();
 
-    use clap::Parser;
+    use clap::Parser as _;
     let mode = cli::Cli::parse();
 
     let source = mode

@@ -1,6 +1,6 @@
 use crate::settings::ImageMode;
 use crate::state::{SystemCommand, ViewerAppStateRef, ViewerSystemCommand};
-use eframe::egui::{Checkbox, Key, KeyboardShortcut, Modifiers, Slider, TextureFilter, Ui};
+use eframe::egui::{Checkbox, Slider, TextureFilter, Ui};
 
 pub fn viewer_options(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
     let mut settings = state.app.settings.clone();

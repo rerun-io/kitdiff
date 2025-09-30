@@ -1,6 +1,5 @@
-use crate::settings::ImageMode;
-use crate::state::{AppStateRef, PageRef, ViewFilter, ViewerAppStateRef, ViewerStateRef};
-use eframe::egui::{Image, RichText, SizeHint, TextureOptions, Ui};
+use crate::state::ViewerAppStateRef;
+use eframe::egui::{Image, RichText, SizeHint, Ui};
 
 pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
     ui.label("Use 1/2/3 to only show old / new / diff at 100% opacity. Arrow keys to navigate.");

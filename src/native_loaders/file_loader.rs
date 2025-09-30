@@ -6,7 +6,6 @@ use egui_inbox::UiInbox;
 use ignore::WalkBuilder;
 use ignore::types::TypesBuilder;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc;
 use std::task::Poll;
 
 pub struct FileLoader {
@@ -32,7 +31,7 @@ impl FileLoader {
 
                 for result in WalkBuilder::new(&base_path).types(types).build() {
                     if let Ok(entry) = result {
-                        if entry.file_type().map_or(false, |ft| ft.is_file()) {
+                        if entry.file_type().is_some_and(|ft| ft.is_file()) {
                             if let Some(snapshot) = try_create_snapshot(entry.path(), &base_path) {
                                 if sender.send(Some(snapshot)).is_err() {
                                     break;

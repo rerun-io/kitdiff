@@ -1,6 +1,6 @@
 use crate::diff_image_loader;
 use crate::diff_image_loader::DiffOptions;
-use crate::state::{AppStateRef, PageRef, ViewerStateRef};
+use crate::state::{AppStateRef, PageRef};
 use eframe::egui;
 use eframe::egui::{Color32, ImageSource};
 use std::path::PathBuf;
@@ -24,11 +24,11 @@ pub enum FileReference {
 impl FileReference {
     pub fn to_uri(&self) -> String {
         match self {
-            FileReference::Path(path) => format!("file://{}", path.display()),
-            FileReference::Source(source) => match source {
+            Self::Path(path) => format!("file://{}", path.display()),
+            Self::Source(source) => match source {
                 ImageSource::Uri(uri) => uri.to_string(),
                 ImageSource::Bytes { uri, .. } => uri.to_string(),
-                _ => "unknown://unknown".to_string(),
+                _ => "unknown://unknown".to_owned(),
             },
         }
     }

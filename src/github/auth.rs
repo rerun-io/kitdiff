@@ -1,10 +1,10 @@
+use crate::github::model::GithubRepoLink;
 use crate::state::SystemCommand;
 use eframe::egui;
 use ehttp;
 use serde_json;
 use std::fmt;
 use std::sync::mpsc;
-use crate::github::model::GithubRepoLink;
 
 pub enum GithubAuthCommand {
     Login,
@@ -13,16 +13,16 @@ pub enum GithubAuthCommand {
 
 impl From<GithubAuthCommand> for SystemCommand {
     fn from(cmd: GithubAuthCommand) -> Self {
-        SystemCommand::GithubAuth(cmd)
+        Self::GithubAuth(cmd)
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct AuthState {
     pub logged_in: Option<LoggedInState>,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct LoggedInState {
     pub supabase_token: String,
     pub github_token: String, // GitHub OAuth token
@@ -48,7 +48,7 @@ impl GitHubAuth {
 
         if let Some(token) = token {
             client = client
-                .user_access_token(token.to_string())
+                .user_access_token(token.to_owned())
                 .expect("Invalid token");
         }
 
@@ -70,9 +70,9 @@ pub enum AuthError {
 impl fmt::Display for AuthError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AuthError::NetworkError(msg) => write!(f, "Network error: {}", msg),
-            AuthError::ParseError(msg) => write!(f, "Parse error: {}", msg),
-            AuthError::AuthenticationError(msg) => write!(f, "Authentication error: {}", msg),
+            Self::NetworkError(msg) => write!(f, "Network error: {msg}"),
+            Self::ParseError(msg) => write!(f, "Parse error: {msg}"),
+            Self::AuthenticationError(msg) => write!(f, "Authentication error: {msg}"),
         }
     }
 }
@@ -121,11 +121,11 @@ pub fn parse_github_artifact_url(url: &str) -> Option<(GithubRepoLink, String)> 
         && parts[6] == "artifacts"
         && parts.len() >= 8
     {
-        let owner = parts[1].to_string();
-        let repo = parts[2].to_string();
+        let owner = parts[1].to_owned();
+        let repo = parts[2].to_owned();
         Some((
             GithubRepoLink { owner, repo },
-            parts[7].to_string(), // artifact_id
+            parts[7].to_owned(), // artifact_id
         ))
     } else {
         None
@@ -133,17 +133,14 @@ pub fn parse_github_artifact_url(url: &str) -> Option<(GithubRepoLink, String)> 
 }
 
 pub fn github_artifact_api_url(owner: &str, repo: &str, artifact_id: &str) -> String {
-    format!(
-        "https://api.github.com/repos/{}/{}/actions/artifacts/{}/zip",
-        owner, repo, artifact_id
-    )
+    format!("https://api.github.com/repos/{owner}/{repo}/actions/artifacts/{artifact_id}/zip")
 }
 
 impl GitHubAuth {
     pub fn new(state: AuthState) -> Self {
         // Supabase configuration
-        let supabase_url = "https://fqhsaeyjqrjmlkqflvho.supabase.co".to_string(); // Replace with your project
-        let supabase_anon_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxaHNhZXlqcXJqbWxrcWZsdmhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgyMTk4MzIsImV4cCI6MjA3Mzc5NTgzMn0.TuhMjHhBCNyKquyVWq3djOfpBVDhcpSmNRWSErpseuw".to_string(); // Replace with your anon key
+        let supabase_url = "https://fqhsaeyjqrjmlkqflvho.supabase.co".to_owned(); // Replace with your project
+        let supabase_anon_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxaHNhZXlqcXJqbWxrcWZsdmhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgyMTk4MzIsImV4cCI6MjA3Mzc5NTgzMn0.TuhMjHhBCNyKquyVWq3djOfpBVDhcpSmNRWSErpseuw".to_owned(); // Replace with your anon key
 
         let (auth_sender, auth_receiver) = mpsc::channel();
 
@@ -278,23 +275,23 @@ impl GitHubAuth {
         let mut request = ehttp::Request::get("https://api.github.com/user");
         request
             .headers
-            .insert("Authorization".to_string(), format!("Bearer {}", token));
+            .insert("Authorization".to_owned(), format!("Bearer {token}"));
         request
             .headers
-            .insert("User-Agent".to_string(), "kitdiff-app".to_string());
+            .insert("User-Agent".to_owned(), "kitdiff-app".to_owned());
 
         let response = ehttp::fetch_async(request)
             .await
-            .map_err(|e| AuthError::NetworkError(format!("Failed to fetch user info: {}", e)))?;
+            .map_err(|e| AuthError::NetworkError(format!("Failed to fetch user info: {e}")))?;
 
         if response.status == 200 {
             let user_info: serde_json::Value = serde_json::from_slice(&response.bytes)
-                .map_err(|e| AuthError::ParseError(format!("Failed to parse user info: {}", e)))?;
+                .map_err(|e| AuthError::ParseError(format!("Failed to parse user info: {e}")))?;
 
             let username = user_info["login"]
                 .as_str()
-                .ok_or_else(|| AuthError::ParseError("Username not found in response".to_string()))?
-                .to_string();
+                .ok_or_else(|| AuthError::ParseError("Username not found in response".to_owned()))?
+                .to_owned();
 
             Ok(username)
         } else {
@@ -348,7 +345,7 @@ impl GitHubAuth {
                     self.state = state;
                 }
                 AuthEvent::Error(error) => {
-                    eprintln!("Auth error: {}", error);
+                    eprintln!("Auth error: {error}");
                 }
                 _ => {}
             }

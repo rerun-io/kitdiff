@@ -1,6 +1,5 @@
-use std::ops::Deref;
-use octocrab::Page;
 use crate::github::model::GithubRepoLink;
+use std::ops::Deref;
 
 pub struct RepoClient {
     client: octocrab::Octocrab,

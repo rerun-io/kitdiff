@@ -1,8 +1,8 @@
 use crate::diff_image_loader::DiffOptions;
-use eframe::egui::TextureFilter;
 use crate::github::auth::{AuthState, LoggedInState};
+use eframe::egui::TextureFilter;
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ImageMode {
     Pixel,
     Fit,

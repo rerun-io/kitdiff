@@ -4,12 +4,10 @@ use eframe::egui::load::Bytes;
 use eframe::egui::{Context, ImageSource};
 use egui_inbox::{UiInbox, UiInboxSender};
 use git2::{ObjectType, Repository};
-use serde_json::Value;
 use std::borrow::Cow;
 use std::fmt::Display;
 use std::path::{Path, PathBuf};
 use std::str;
-use std::sync::mpsc;
 use std::task::Poll;
 
 enum Command {
@@ -124,13 +122,13 @@ pub enum GitError {
 impl Display for GitError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            GitError::RepoNotFound => write!(f, "Git repository not found"),
-            GitError::BranchNotFound => write!(f, "Default branch not found"),
-            GitError::FileNotFound => write!(f, "File not found in git tree"),
-            GitError::GitError(err) => write!(f, "Git error: {}", err),
-            GitError::IoError(err) => write!(f, "IO error: {}", err),
-            GitError::PrUrlParseError => write!(f, "Failed to parse PR URL"),
-            GitError::NetworkError(msg) => write!(f, "Network error: {}", msg),
+            Self::RepoNotFound => write!(f, "Git repository not found"),
+            Self::BranchNotFound => write!(f, "Default branch not found"),
+            Self::FileNotFound => write!(f, "File not found in git tree"),
+            Self::GitError(err) => write!(f, "Git error: {err}"),
+            Self::IoError(err) => write!(f, "IO error: {err}"),
+            Self::PrUrlParseError => write!(f, "Failed to parse PR URL"),
+            Self::NetworkError(msg) => write!(f, "Network error: {msg}"),
         }
     }
 }
@@ -139,13 +137,13 @@ impl std::error::Error for GitError {}
 
 impl From<git2::Error> for GitError {
     fn from(err: git2::Error) -> Self {
-        GitError::GitError(err)
+        Self::GitError(err)
     }
 }
 
 impl From<std::io::Error> for GitError {
     fn from(err: std::io::Error) -> Self {
-        GitError::IoError(err)
+        Self::IoError(err)
     }
 }
 
@@ -155,7 +153,7 @@ fn run_git_discovery(sender: Sender, base_path: PathBuf) -> Result<(), GitError>
 
     // Get current branch
     let head = repo.head()?;
-    let current_branch = head.shorthand().unwrap_or("HEAD").to_string();
+    let current_branch = head.shorthand().unwrap_or("HEAD").to_owned();
 
     // Find default branch (try main, then master, then first branch)
     let default_branch = find_default_branch(&repo)?;
@@ -167,7 +165,7 @@ fn run_git_discovery(sender: Sender, base_path: PathBuf) -> Result<(), GitError>
         .and_then(|p| p.file_name())
         .and_then(|n| n.to_str())
         .unwrap_or("unknown")
-        .to_string();
+        .to_owned();
     sender
         .send(Command::GitInfo(GitInfo {
             current_branch: current_branch.clone(),
@@ -178,10 +176,7 @@ fn run_git_discovery(sender: Sender, base_path: PathBuf) -> Result<(), GitError>
 
     // Don't compare branch with itself
     if current_branch == default_branch {
-        eprintln!(
-            "Current branch is the same as default branch ({})",
-            current_branch
-        );
+        eprintln!("Current branch is the same as default branch ({current_branch})");
         return Ok(());
     }
 
@@ -241,7 +236,7 @@ fn find_default_branch(repo: &Repository) -> Result<String, GitError> {
     // Try common default branch names
     for branch_name in ["main", "master"] {
         if repo.resolve_reference_from_short_name(branch_name).is_ok() {
-            return Ok(branch_name.to_string());
+            return Ok(branch_name.to_owned());
         }
     }
 
@@ -250,7 +245,7 @@ fn find_default_branch(repo: &Repository) -> Result<String, GitError> {
     for branch in branches {
         let (branch, _) = branch?;
         if let Some(name) = branch.name()? {
-            return Ok(name.to_string());
+            return Ok(name.to_owned());
         }
     }
 
@@ -406,7 +401,7 @@ fn parse_github_https_url(url: &str) -> Option<(String, String)> {
 
         let parts: Vec<&str> = path.split('/').collect();
         if parts.len() >= 2 {
-            return Some((parts[0].to_string(), parts[1].to_string()));
+            return Some((parts[0].to_owned(), parts[1].to_owned()));
         }
     }
     None
@@ -420,7 +415,7 @@ fn parse_github_ssh_url(url: &str) -> Option<(String, String)> {
 
         let parts: Vec<&str> = path.split('/').collect();
         if parts.len() >= 2 {
-            return Some((parts[0].to_string(), parts[1].to_string()));
+            return Some((parts[0].to_owned(), parts[1].to_owned()));
         }
     }
     None

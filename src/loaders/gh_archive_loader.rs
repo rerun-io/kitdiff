@@ -7,12 +7,11 @@ use anyhow::Error;
 use bytes::Bytes;
 use eframe::egui::{Context, Ui};
 use egui_inbox::UiInbox;
-use futures::SinkExt;
+use futures::SinkExt as _;
 use octocrab::Octocrab;
-use octocrab::models::ArtifactId;
 use octocrab::params::actions::ArchiveFormat;
-use std::task::Poll;
 use serde_json::json;
+use std::task::Poll;
 
 pub struct GHArtifactLoader {
     state: LoaderState,
@@ -108,14 +107,15 @@ impl LoadSnapshots for GHArtifactLoader {
 
     fn files_header(&self) -> String {
         match &self.state {
-            LoaderState::LoadingData(_) => "Github Artifact".to_string(),
+            LoaderState::LoadingData(_) => "Github Artifact".to_owned(),
             LoaderState::LoadingArchive(loader) => loader.files_header(),
-            LoaderState::Error(_) => "Github Artifact".to_string(),
+            LoaderState::Error(_) => "Github Artifact".to_owned(),
         }
     }
 
     fn extra_ui(&self, ui: &mut Ui, state: &AppStateRef<'_>) {
-        if let Some((git_ref, run_id)) = self.artifact.branch_name.clone().zip(self.artifact.run_id) {
+        if let Some((git_ref, run_id)) = self.artifact.branch_name.clone().zip(self.artifact.run_id)
+        {
             let response = ui
                 .button("Update snapshots from this archive")
                 .on_hover_text(

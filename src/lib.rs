@@ -36,14 +36,14 @@ impl DiffSource {
     pub fn load(self, ctx: Context, state: &AppState) -> SnapshotLoader {
         match self {
             #[cfg(not(target_arch = "wasm32"))]
-            DiffSource::Files(path) => Box::new(native_loaders::file_loader::FileLoader::new(path)),
+            Self::Files(path) => Box::new(native_loaders::file_loader::FileLoader::new(path)),
             #[cfg(not(target_arch = "wasm32"))]
-            DiffSource::Git(path) => Box::new(native_loaders::git_loader::GitLoader::new(path)),
-            DiffSource::Pr(url) => Box::new(loaders::pr_loader::PrLoader::new(
+            Self::Git(path) => Box::new(native_loaders::git_loader::GitLoader::new(path)),
+            Self::Pr(url) => Box::new(loaders::pr_loader::PrLoader::new(
                 url,
                 state.github_auth.client(),
             )),
-            DiffSource::GHArtifact(artifact) => {
+            Self::GHArtifact(artifact) => {
                 Box::new(loaders::gh_archive_loader::GHArtifactLoader::new(
                     state.github_auth.client(),
                     artifact,
@@ -195,8 +195,8 @@ impl PathOrBlob {
     pub fn load_bytes(&self) -> Option<Bytes> {
         match self {
             #[cfg(not(target_arch = "wasm32"))]
-            PathOrBlob::Path(path) => std::fs::read(path).ok().map(Bytes::from),
-            PathOrBlob::Blob(bytes) => Some(bytes.clone()),
+            Self::Path(path) => std::fs::read(path).ok().map(Bytes::from),
+            Self::Blob(bytes) => Some(bytes.clone()),
             #[cfg(target_arch = "wasm32")]
             PathOrBlob::Path(_) => None, // Paths not supported in wasm
             #[cfg(target_arch = "wasm32")]

@@ -7,9 +7,8 @@ use egui_inbox::{UiInbox, UiInboxSender};
 use flate2::read::GzDecoder;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read as _};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc;
 use std::task::Poll;
 use tar::Archive;
 use zip::ZipArchive;
@@ -33,7 +32,7 @@ fn is_tar_gz(data: &[u8]) -> bool {
 
 impl ArchiveLoader {
     pub fn new(data: DataReference) -> Self {
-        let name = data.file_name().to_string();
+        let name = data.file_name().to_owned();
         let mut inbox = UiInbox::new();
 
         inbox.spawn(|tx| async move {
@@ -56,15 +55,12 @@ impl LoadSnapshots for ArchiveLoader {
 
     fn update(&mut self, ctx: &Context) {
         if let Some(mut new_data) = self.inbox.read(ctx).last() {
-            match &mut new_data {
-                Ok(data) => {
-                    data.sort_by_key(|s| s.path.to_string_lossy().to_lowercase());
-                    for snapshot in data {
-                        // We need to register bytes so that the diff loader can find them
-                        snapshot.register_bytes(ctx);
-                    }
+            if let Ok(data) = &mut new_data {
+                data.sort_by_key(|s| s.path.to_string_lossy().to_lowercase());
+                for snapshot in data {
+                    // We need to register bytes so that the diff loader can find them
+                    snapshot.register_bytes(ctx);
                 }
-                _ => {}
             }
             self.data = Poll::Ready(new_data);
         }
@@ -95,8 +91,7 @@ pub async fn run_discovery(file: DataReference) -> anyhow::Result<Vec<Snapshot>>
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
-        let data = tokio::task::spawn_blocking(move || sync_discovery(data)).await?;
-        data
+        tokio::task::spawn_blocking(move || sync_discovery(data)).await?
     }
 }
 
@@ -122,7 +117,7 @@ fn run_zip_discovery(zip_data: Bytes) -> Result<HashMap<PathBuf, Vec<u8>>> {
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)?;
         let file_path = match file.enclosed_name() {
-            Some(path) => path.to_path_buf(),
+            Some(path) => path.clone(),
             None => continue, // Skip files with invalid names
         };
 
@@ -164,7 +159,7 @@ fn get_snapshots(files: HashMap<PathBuf, Vec<u8>>) -> Vec<Snapshot> {
     let mut snapshots = Vec::new();
     let mut processed_files = std::collections::HashSet::new();
 
-    for (png_path, _) in &files {
+    for png_path in files.keys() {
         if processed_files.contains(png_path) {
             continue;
         }
@@ -213,10 +208,12 @@ fn try_create_snapshot(png_path: &Path, files: &HashMap<PathBuf, Vec<u8>>) -> Op
     let base_data = files.get(png_path)?;
 
     let diff_data = files.get(&diff_path);
-    let diff_reference = diff_data.map(|data| FileReference::Source(ImageSource::Bytes {
-        uri: Cow::Owned(format!("bytes://{}", diff_path.display())),
-        bytes: eframe::egui::load::Bytes::Shared(data.clone().into()),
-    }));
+    let diff_reference = diff_data.map(|data| {
+        FileReference::Source(ImageSource::Bytes {
+            uri: Cow::Owned(format!("bytes://{}", diff_path.display())),
+            bytes: eframe::egui::load::Bytes::Shared(data.clone().into()),
+        })
+    });
 
     if files.contains_key(&old_path) {
         // old.png exists, use original as new and old.png as old
@@ -265,5 +262,5 @@ fn try_create_snapshot(png_path: &Path, files: &HashMap<PathBuf, Vec<u8>>) -> Op
 fn get_variant_path(base_path: &Path, variant: &str) -> Option<PathBuf> {
     let stem = base_path.file_stem()?.to_str()?;
     let parent = base_path.parent().unwrap_or(Path::new(""));
-    Some(parent.join(format!("{}.{}.png", stem, variant)))
+    Some(parent.join(format!("{stem}.{variant}.png")))
 }

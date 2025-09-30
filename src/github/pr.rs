@@ -1,34 +1,21 @@
 use crate::DiffSource;
 use eframe::egui;
-use eframe::egui::{Button, Context, Popup, ScrollArea, Spinner};
+use eframe::egui::{Button, Context, ScrollArea, Spinner};
 use egui_inbox::UiInbox;
 use futures::stream::FuturesUnordered;
-use futures::{StreamExt, TryStreamExt};
+use futures::{StreamExt as _, TryStreamExt as _};
 use graphql_client::GraphQLQuery;
-use octocrab::{AuthState, Octocrab, Page};
-use re_ui::egui_ext::boxed_widget::BoxedWidgetLocalExt;
-use std::borrow::Cow;
+use octocrab::Octocrab;
+use re_ui::egui_ext::boxed_widget::BoxedWidgetLocalExt as _;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
-use std::future::ready;
-use std::pin::pin;
-use std::str::FromStr;
-use std::sync::mpsc;
 use std::task::Poll;
 // Import octocrab models
 use crate::github::octokit::RepoClient;
 use crate::state::{AppStateRef, SystemCommand};
-use octocrab::models::commits::GithubCommitStatus;
-use octocrab::models::{
-    CombinedStatus, RunId, Status,
-    pulls::PullRequest,
-    repos::RepoCommit,
-    workflows::{Run, WorkflowListArtifact},
-};
-use octocrab::params::repos::Reference;
-use octocrab::workflows::ListRunsBuilder;
-use re_ui::list_item::{LabelContent, ListItemContentButtonsExt, list_item_scope};
-use re_ui::{OnResponseExt, SectionCollapsingHeader, UiExt, icons};
+use octocrab::models::{RunId, workflows::WorkflowListArtifact};
+use re_ui::list_item::{LabelContent, ListItemContentButtonsExt as _, list_item_scope};
+use re_ui::{OnResponseExt as _, SectionCollapsingHeader, UiExt as _, icons};
 // use chrono::DateTime;
 pub type GitObjectID = String;
 pub type DateTime = String;
@@ -49,7 +36,7 @@ use anyhow::{Error, Result, anyhow};
 pub fn parse_github_pr_url(url: &str) -> Result<(String, String, u32), String> {
     // Parse URLs like: https://github.com/rerun-io/rerun/pull/11253
     if !url.starts_with("https://github.com/") {
-        return Err("URL must start with https://github.com/".to_string());
+        return Err("URL must start with https://github.com/".to_owned());
     }
 
     let path = url
@@ -58,11 +45,11 @@ pub fn parse_github_pr_url(url: &str) -> Result<(String, String, u32), String> {
 
     let parts: Vec<&str> = path.split('/').collect();
     if parts.len() != 4 || parts[2] != "pull" {
-        return Err("Expected format: https://github.com/owner/repo/pull/123".to_string());
+        return Err("Expected format: https://github.com/owner/repo/pull/123".to_owned());
     }
 
-    let user = parts[0].to_string();
-    let repo = parts[1].to_string();
+    let user = parts[0].to_owned();
+    let repo = parts[1].to_owned();
     let pr_number = parts[3].parse::<u32>().map_err(|_| "Invalid PR number")?;
 
     Ok((user, repo, pr_number))
@@ -165,33 +152,34 @@ impl GithubPr {
                         pr_data.artifacts.insert(sha, Poll::Ready(artifacts));
                     }
                 }
-                GithubPrCommand::FetchCommitArtifacts { sha } => match &mut self.data {
-                    Poll::Ready(Ok(pr_data)) => match pr_data.artifacts.entry(sha.clone()) {
-                        Entry::Occupied(_) => {}
-                        Entry::Vacant(entry) => {
-                            entry.insert(Poll::Pending);
+                GithubPrCommand::FetchCommitArtifacts { sha } => {
+                    if let Poll::Ready(Ok(pr_data)) = &mut self.data {
+                        match pr_data.artifacts.entry(sha.clone()) {
+                            Entry::Occupied(_) => {}
+                            Entry::Vacant(entry) => {
+                                entry.insert(Poll::Pending);
 
-                            let workflow_run_ids = pr_data
-                                .commits
-                                .iter()
-                                .find(|c| c.sha == sha)
-                                .map(|c| c.workflow_run_ids.clone())
-                                .unwrap_or_default();
+                                let workflow_run_ids = pr_data
+                                    .commits
+                                    .iter()
+                                    .find(|c| c.sha == sha)
+                                    .map(|c| c.workflow_run_ids.clone())
+                                    .unwrap_or_default();
 
-                            let client =
-                                RepoClient::new(self.client.clone(), self.link.repo.clone());
-                            self.inbox.spawn(move |tx| async move {
-                                let artifacts =
-                                    fetch_commit_artifacts(&client, workflow_run_ids).await;
-                                let _ = tx.send(GithubPrCommand::FetchedCommitArtifacts {
-                                    sha,
-                                    artifacts,
+                                let client =
+                                    RepoClient::new(self.client.clone(), self.link.repo.clone());
+                                self.inbox.spawn(move |tx| async move {
+                                    let artifacts =
+                                        fetch_commit_artifacts(&client, workflow_run_ids).await;
+                                    let _ = tx.send(GithubPrCommand::FetchedCommitArtifacts {
+                                        sha,
+                                        artifacts,
+                                    });
                                 });
-                            });
+                            }
                         }
-                    },
-                    _ => {}
-                },
+                    }
+                }
             }
         }
     }
@@ -278,9 +266,9 @@ async fn get_pr_commits(repo: &RepoClient, pr: PrNumber) -> Result<PrWithCommits
                     false
                 };
                 if error {
-                    status = CommitState::Failure
+                    status = CommitState::Failure;
                 } else if pending && status != CommitState::Failure {
-                    status = CommitState::Pending
+                    status = CommitState::Pending;
                 }
 
                 if let Some(run) = suite.workflow_run {
@@ -293,7 +281,7 @@ async fn get_pr_commits(repo: &RepoClient, pr: PrNumber) -> Result<PrWithCommits
             data.commits.push(CommitData {
                 message,
                 sha,
-                status: status,
+                status,
                 workflow_run_ids: workflow_run_ids.into_iter().collect(),
             });
         }
@@ -371,7 +359,7 @@ pub fn pr_ui(ui: &mut egui::Ui, state: &AppStateRef<'_>, pr: &GithubPr) {
                                 Some(Poll::Ready(Err(error))) => {
                                     ui.colored_label(
                                         ui.visuals().error_fg_color,
-                                        format!("Error: {}", error),
+                                        format!("Error: {error}"),
                                     );
                                 }
                                 Some(Poll::Ready(Ok(artifacts))) => {
@@ -406,7 +394,7 @@ pub fn pr_ui(ui: &mut egui::Ui, state: &AppStateRef<'_>, pr: &GithubPr) {
             });
         }
         Poll::Ready(Err(error)) => {
-            ui.colored_label(ui.visuals().error_fg_color, format!("Error: {}", error));
+            ui.colored_label(ui.visuals().error_fg_color, format!("Error: {error}"));
         }
         Poll::Pending => {
             SectionCollapsingHeader::new(format!("PR: {}", pr.link))

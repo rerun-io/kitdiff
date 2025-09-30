@@ -1,5 +1,5 @@
 use crate::state::AppStateRef;
-use eframe::egui::{CentralPanel, Context, Ui};
+use eframe::egui::{CentralPanel, Context};
 
 pub fn home_view(ctx: &Context, app: &AppStateRef<'_>) {
     CentralPanel::default().show(ctx, |ui| {

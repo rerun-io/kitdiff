@@ -1,6 +1,6 @@
+use octocrab::models::{ArtifactId, RunId};
 use std::fmt::Display;
 use std::str::FromStr;
-use octocrab::models::{ArtifactId, RunId};
 
 pub type PrNumber = u64;
 
@@ -31,9 +31,9 @@ impl FromStr for GithubRepoLink {
         let owner = parts.next().ok_or(GithubParseErr::MissingOwner)?;
         let repo = parts.next().ok_or(GithubParseErr::MissingRepo)?;
 
-        Ok(GithubRepoLink {
-            owner: owner.to_string(),
-            repo: repo.to_string(),
+        Ok(Self {
+            owner: owner.to_owned(),
+            repo: repo.to_owned(),
         })
     }
 }
@@ -66,10 +66,10 @@ impl FromStr for GithubPrLink {
             .parse()
             .map_err(GithubParseErr::InvalidPrNumber)?;
 
-        Ok(GithubPrLink {
+        Ok(Self {
             repo: GithubRepoLink {
-                owner: owner.to_string(),
-                repo: repo.to_string(),
+                owner: owner.to_owned(),
+                repo: repo.to_owned(),
             },
             pr_number: number,
         })
@@ -100,8 +100,6 @@ impl GithubArtifactLink {
         self.name
             .as_deref()
             .unwrap_or(&self.artifact_id.to_string())
-            .to_string()
+            .to_owned()
     }
 }
-
-

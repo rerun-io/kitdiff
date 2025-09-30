@@ -1,16 +1,14 @@
 use crate::github::model::{GithubPrLink, GithubRepoLink};
 use crate::github::octokit::RepoClient;
 use crate::github::pr::{GithubPr, pr_ui};
-use crate::loaders::{LoadSnapshots, SnapshotLoader, sort_snapshots};
+use crate::loaders::{LoadSnapshots, sort_snapshots};
 use crate::snapshot::{FileReference, Snapshot};
 use crate::state::AppStateRef;
 use eframe::egui::{Context, Ui};
 use egui_inbox::{UiInbox, UiInboxSender};
-use futures::StreamExt;
+use futures::StreamExt as _;
 use octocrab::models::repos::{DiffEntry, DiffEntryStatus};
-use octocrab::{Error, Octocrab, Result};
-use std::ops::Deref;
-use std::path::Path;
+use octocrab::{Octocrab, Result};
 use std::pin::pin;
 use std::task::Poll;
 
@@ -68,10 +66,7 @@ async fn stream_files(
         let file: DiffEntry = file;
         if file.filename.ends_with(".png") {
             let old_url = if file.status != DiffEntryStatus::Added {
-                let old_file_name = file
-                    .previous_filename
-                    .as_deref()
-                    .unwrap_or(file.filename.deref());
+                let old_file_name = file.previous_filename.as_deref().unwrap_or(&*file.filename);
                 Some(create_media_url(
                     repo_client.repo(),
                     &pr.base.sha,

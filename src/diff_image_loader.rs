@@ -1,6 +1,6 @@
 use eframe::egui::load::{ImageLoadResult, ImageLoader, ImagePoll, LoadError};
 use eframe::egui::mutex::Mutex;
-use eframe::egui::{Color32, ColorImage, Context, Image, ImageSource, SizeHint};
+use eframe::egui::{Color32, ColorImage, Context, SizeHint};
 use eframe::epaint::ahash::HashMap;
 use egui_extras::loaders::image_loader::ImageCrateLoader;
 use std::sync::Arc;
@@ -80,7 +80,7 @@ impl DiffImageLoader {
 }
 
 impl ImageLoader for DiffImageLoader {
-    fn id(&self) -> &str {
+    fn id(&self) -> &'static str {
         "DiffLoader"
     }
 
@@ -96,46 +96,41 @@ impl ImageLoader for DiffImageLoader {
                 Ok(Poll::Pending) => ImageLoadResult::Ok(ImagePoll::Pending { size: None }),
                 Err(err) => ImageLoadResult::Err(err.clone()),
             }
-        } else {
-            if let Some(diff_uri) = DiffUri::from_uri(uri) {
-                let old_image = self.image_loader.load(ctx, &diff_uri.old, size_hint);
-                let new_image = self.image_loader.load(ctx, &diff_uri.new, size_hint);
+        } else if let Some(diff_uri) = DiffUri::from_uri(uri) {
+            let old_image = self.image_loader.load(ctx, &diff_uri.old, size_hint);
+            let new_image = self.image_loader.load(ctx, &diff_uri.new, size_hint);
 
-                let (old_image, new_image) = (old_image?, new_image?);
+            let (old_image, new_image) = (old_image?, new_image?);
 
-                if let (
-                    ImagePoll::Ready { image: old_image },
-                    ImagePoll::Ready { image: new_image },
-                ) = (old_image, new_image)
+            if let (ImagePoll::Ready { image: old_image }, ImagePoll::Ready { image: new_image }) =
+                (old_image, new_image)
+            {
+                let cache = self.diffs.clone();
+                let ctx = ctx.clone();
+
+                self.diffs
+                    .lock()
+                    .insert(diff_uri.to_uri(), Ok(Poll::Pending));
+
+                let uri = uri.to_owned();
+                #[cfg(not(target_arch = "wasm32"))]
+                std::thread::spawn(move || {
+                    ctx.request_repaint();
+                    let result = load_diffs(&ctx, old_image, new_image, size_hint, diff_uri);
+                    cache.lock().insert(uri, result.map(Poll::Ready));
+                });
+                #[cfg(target_arch = "wasm32")]
                 {
-                    let cache = self.diffs.clone();
-                    let ctx = ctx.clone();
-
-                    self.diffs
-                        .lock()
-                        .insert(diff_uri.to_uri(), Ok(Poll::Pending));
-
-                    let uri = uri.to_string();
-                    #[cfg(not(target_arch = "wasm32"))]
-                    std::thread::spawn(move || {
+                    wasm_bindgen_futures::spawn_local(async move {
                         ctx.request_repaint();
                         let result = load_diffs(&ctx, old_image, new_image, size_hint, diff_uri);
                         cache.lock().insert(uri, result.map(Poll::Ready));
                     });
-                    #[cfg(target_arch = "wasm32")]
-                    {
-                        wasm_bindgen_futures::spawn_local(async move {
-                            ctx.request_repaint();
-                            let result =
-                                load_diffs(&ctx, old_image, new_image, size_hint, diff_uri);
-                            cache.lock().insert(uri, result.map(Poll::Ready));
-                        });
-                    }
                 }
-                ImageLoadResult::Ok(ImagePoll::Pending { size: None })
-            } else {
-                ImageLoadResult::Err(LoadError::NotSupported)
             }
+            ImageLoadResult::Ok(ImagePoll::Pending { size: None })
+        } else {
+            ImageLoadResult::Err(LoadError::NotSupported)
         }
     }
 
@@ -172,7 +167,7 @@ pub fn load_diffs(
         old_img.as_raw().to_vec(),
     )
     .ok_or(LoadError::Loading(
-        "Failed to convert to RgbaImage".to_string(),
+        "Failed to convert to RgbaImage".to_owned(),
     ))?;
 
     let new = image::RgbaImage::from_vec(
@@ -181,12 +176,12 @@ pub fn load_diffs(
         new_img.as_raw().to_vec(),
     )
     .ok_or(LoadError::Loading(
-        "Failed to convert to RgbaImage".to_string(),
+        "Failed to convert to RgbaImage".to_owned(),
     ))?;
 
     if old.dimensions() != new.dimensions() {
         return Err(LoadError::Loading(
-            "Images must have the same dimensions".to_string(),
+            "Images must have the same dimensions".to_owned(),
         ));
     }
 

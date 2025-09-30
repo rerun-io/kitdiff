@@ -1,15 +1,14 @@
-use crate::diff_image_loader::DiffImageLoader;
-use crate::loaders::SnapshotLoader;
-use crate::settings::Settings;
-use crate::snapshot::Snapshot;
-use eframe::egui;
-use eframe::egui::Context;
-use egui_inbox::UiInboxSender;
-use std::ops::Deref;
 use crate::config::Config;
+use crate::diff_image_loader::DiffImageLoader;
 use crate::github::auth::{GitHubAuth, GithubAuthCommand};
 use crate::github::model::GithubPrLink;
 use crate::github::pr::GithubPr;
+use crate::loaders::SnapshotLoader;
+use crate::settings::Settings;
+use crate::snapshot::Snapshot;
+use eframe::egui::Context;
+use egui_inbox::UiInboxSender;
+use std::ops::Deref;
 
 pub struct AppState {
     pub github_auth: GitHubAuth,
@@ -55,7 +54,7 @@ impl ViewerState {
 /// If any is true, only show those, but at full opacity
 ///
 /// If all are false, show all at their set opacities
-#[derive(Default, Copy, Clone, PartialEq)]
+#[derive(Default, Copy, Clone, PartialEq, Eq)]
 pub struct ViewFilter {
     pub show_old: bool,
     pub show_new: bool,
@@ -69,7 +68,7 @@ impl ViewFilter {
 }
 
 impl AppState {
-    pub fn new(settings: Settings, config: Config) -> AppState {
+    pub fn new(settings: Settings, config: Config) -> Self {
         Self {
             github_auth: GitHubAuth::new(settings.auth.clone()),
             github_pr: None,
@@ -202,7 +201,7 @@ pub enum ViewerSystemCommand {
 
 impl From<ViewerSystemCommand> for SystemCommand {
     fn from(value: ViewerSystemCommand) -> Self {
-        SystemCommand::ViewerCommand(value)
+        Self::ViewerCommand(value)
     }
 }
 
@@ -210,7 +209,7 @@ impl AppState {
     pub fn handle(&mut self, ctx: &Context, command: SystemCommand) {
         match command {
             SystemCommand::Open(source) => {
-                let loader = source.load(ctx.clone(), &self);
+                let loader = source.load(ctx.clone(), self);
                 self.page = Page::DiffViewer(ViewerState {
                     filter: String::new(),
                     index: 0,
@@ -223,10 +222,7 @@ impl AppState {
                 self.github_auth.handle(auth);
             }
             SystemCommand::LoadPrDetails(url) => {
-                self.github_pr = Some(GithubPr::new(
-                    url,
-                    self.github_auth.client(),
-                ));
+                self.github_pr = Some(GithubPr::new(url, self.github_auth.client()));
             }
             SystemCommand::UpdateSettings(settings) => {
                 self.settings = settings;

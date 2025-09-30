@@ -29,13 +29,13 @@ pub enum Commands {
 impl Commands {
     pub fn to_source(&self) -> DiffSource {
         match self {
-            Commands::Files { directory } => {
+            Self::Files { directory } => {
                 DiffSource::Files(directory.clone().unwrap_or_else(|| ".".into()).into())
             }
-            Commands::Git { repo_path } => {
+            Self::Git { repo_path } => {
                 DiffSource::Git(repo_path.clone().unwrap_or_else(|| ".".into()).into())
             }
-            Commands::Pr { url } => {
+            Self::Pr { url } => {
                 // Check if the PR URL is actually a GitHub artifact URL
                 if let Some((repo, artifact_id)) = parse_github_artifact_url(url) {
                     DiffSource::GHArtifact(GithubArtifactLink {
@@ -45,15 +45,13 @@ impl Commands {
                         branch_name: None,
                         run_id: None,
                     })
+                } else if let Ok(parsed_url) = url.parse() {
+                    DiffSource::Pr(parsed_url)
                 } else {
-                    if let Ok(parsed_url) = url.parse() {
-                        DiffSource::Pr(parsed_url)
-                    } else {
-                        panic!("Invalid GitHub PR URL: {}", url);
-                    }
+                    panic!("Invalid GitHub PR URL: {url}");
                 }
             }
-            Commands::Zip { source } => {
+            Self::Zip { source } => {
                 // // Check if it's a GitHub artifact URL first
                 // if let Some((repo, artifact_id)) = parse_github_artifact_url(source) {
                 //     DiffSource::GHArtifact {
@@ -85,7 +83,7 @@ impl Commands {
                 // }
                 todo!()
             }
-            Commands::GhArtifact { url } => {
+            Self::GhArtifact { url } => {
                 // if let Some((owner, repo, artifact_id)) = parse_github_artifact_url(url) {
                 //     DiffSource::GHArtifact {
                 //         owner,
