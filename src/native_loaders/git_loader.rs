@@ -185,21 +185,23 @@ fn run_git_discovery(sender: Sender, base_path: PathBuf) -> Result<(), GitError>
         return Ok(());
     }
 
-    // Get the commit from default branch
+    // Get the merge base between current branch and default branch
+    let head_commit = repo.head()?.peel_to_commit()?;
     let default_commit = repo
         .resolve_reference_from_short_name(&default_branch)?
         .peel_to_commit()?;
+    let base_commit = repo.merge_base(head_commit.id(), default_commit.id())?;
+    let base_commit = repo.find_commit(base_commit)?;
 
     // Get GitHub repository info for LFS support
     let github_repo_info = get_github_repo_info(&repo);
-    let commit_sha = default_commit.id().to_string();
+    let commit_sha = base_commit.id().to_string();
 
-    // Get current HEAD for comparison with default branch
-    let head_commit = repo.head()?.peel_to_commit()?;
+    // Get current HEAD tree for comparison
     let head_tree = head_commit.tree()?;
 
-    // Use git2 diff to find changed PNG files between default branch and current HEAD
-    let diff = repo.diff_tree_to_tree(Some(&default_commit.tree()?), Some(&head_tree), None)?;
+    // Use git2 diff to find changed PNG files between merge base and current HEAD
+    let diff = repo.diff_tree_to_tree(Some(&base_commit.tree()?), Some(&head_tree), None)?;
 
     // Process each delta (changed file)
     diff.foreach(
@@ -214,7 +216,7 @@ fn run_git_discovery(sender: Sender, base_path: PathBuf) -> Result<(), GitError>
                         // Create snapshot for this changed PNG file
                         if let Ok(Some(snapshot)) = create_git_snapshot(
                             &repo,
-                            &default_commit.tree().unwrap(),
+                            &base_commit.tree().unwrap(),
                             file_path,
                             &github_repo_info,
                             &commit_sha,
