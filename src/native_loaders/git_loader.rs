@@ -40,7 +40,7 @@ impl GitLoader {
         {
             let base_path = base_path.clone();
             std::thread::spawn(move || {
-                let result = run_git_discovery(sender.clone(), base_path);
+                let result = run_git_discovery(sender.clone(), &base_path);
                 match result {
                     Ok(()) => {
                         // Signal done
@@ -147,9 +147,9 @@ impl From<std::io::Error> for GitError {
     }
 }
 
-fn run_git_discovery(sender: Sender, base_path: PathBuf) -> Result<(), GitError> {
+fn run_git_discovery(sender: Sender, base_path: &Path) -> Result<(), GitError> {
     // Open git repository in current directory
-    let repo = Repository::open(base_path).map_err(|_| GitError::RepoNotFound)?;
+    let repo = Repository::open(base_path).map_err(|_err| GitError::RepoNotFound)?;
 
     // Get current branch
     let head = repo.head()?;
@@ -209,14 +209,16 @@ fn run_git_discovery(sender: Sender, base_path: PathBuf) -> Result<(), GitError>
                 if let Some(extension) = file_path.extension() {
                     if extension == "png" {
                         // Create snapshot for this changed PNG file
-                        if let Ok(Some(snapshot)) = create_git_snapshot(
-                            &repo,
-                            &base_commit.tree().unwrap(),
-                            file_path,
-                            &github_repo_info,
-                            &commit_sha,
-                        ) {
-                            sender.send(Command::Snapshot(snapshot)).ok();
+                        if let Ok(base_tree) = base_commit.tree() {
+                            if let Ok(Some(snapshot)) = create_git_snapshot(
+                                &repo,
+                                &base_tree,
+                                file_path,
+                                &github_repo_info,
+                                &commit_sha,
+                            ) {
+                                sender.send(Command::Snapshot(snapshot)).ok();
+                            }
                         }
                         break; // Only process once per delta
                     }
@@ -254,7 +256,7 @@ fn find_default_branch(repo: &Repository) -> Result<String, GitError> {
 
 fn create_git_snapshot(
     repo: &Repository,
-    default_tree: &git2::Tree,
+    default_tree: &git2::Tree<'_>,
     relative_path: &Path,
     github_repo_info: &Option<(String, String)>,
     commit_sha: &str,
@@ -272,12 +274,9 @@ fn create_git_snapshot(
         return Ok(None);
     }
 
-    let default_file_content = match get_file_from_tree(repo, default_tree, relative_path) {
-        Ok(content) => content,
-        Err(_) => {
-            // File doesn't exist in default branch, skip
-            return Ok(None);
-        }
+    let Ok(default_file_content) = get_file_from_tree(repo, default_tree, relative_path) else {
+        // File doesn't exist in default branch, skip
+        return Ok(None);
     };
 
     // Get the current file from the current branch's tree to compare git objects properly
@@ -322,7 +321,7 @@ fn create_git_snapshot(
 
 fn get_file_from_tree(
     repo: &Repository,
-    tree: &git2::Tree,
+    tree: &git2::Tree<'_>,
     path: &Path,
 ) -> Result<Vec<u8>, GitError> {
     let entry = tree.get_path(path)?;
@@ -330,7 +329,7 @@ fn get_file_from_tree(
 
     match object.kind() {
         Some(ObjectType::Blob) => {
-            let blob = object.as_blob().unwrap();
+            let blob = object.as_blob().ok_or(GitError::FileNotFound)?;
             Ok(blob.content().to_vec())
         }
         _ => Err(GitError::FileNotFound),
@@ -344,14 +343,13 @@ fn is_lfs_pointer(content: &[u8]) -> bool {
     }
 
     // Try to parse as UTF-8
-    let text = match str::from_utf8(content) {
-        Ok(text) => text,
-        Err(_) => return false,
+    let Ok(text) = str::from_utf8(content) else {
+        return false;
     };
 
     // Check for LFS pointer format
     // Must start with "version https://git-lfs.github.com/spec/v1"
-    let lines: Vec<&str> = text.trim().split('\n').collect();
+    let lines: Vec<&str> = text.lines().collect();
     if lines.is_empty() {
         return false;
     }

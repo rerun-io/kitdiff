@@ -29,6 +29,7 @@ impl FileLoader {
                 types_builder.select("png");
                 let types = types_builder.build().unwrap();
 
+                #[expect(clippy::excessive_nesting)]
                 for result in WalkBuilder::new(&base_path).types(types).build() {
                     if let Ok(entry) = result {
                         if entry.file_type().is_some_and(|ft| ft.is_file()) {

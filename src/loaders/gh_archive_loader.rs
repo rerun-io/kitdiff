@@ -7,7 +7,6 @@ use anyhow::Error;
 use bytes::Bytes;
 use eframe::egui::{Context, Ui};
 use egui_inbox::UiInbox;
-use futures::SinkExt as _;
 use octocrab::Octocrab;
 use octocrab::params::actions::ArchiveFormat;
 use serde_json::json;
@@ -16,7 +15,6 @@ use std::task::Poll;
 pub struct GHArtifactLoader {
     state: LoaderState,
     artifact: GithubArtifactLink,
-    inbox: UiInbox<()>,
 }
 
 #[derive(Debug)]
@@ -40,7 +38,6 @@ impl GHArtifactLoader {
         Self {
             state: LoaderState::LoadingData(inbox),
             artifact,
-            inbox: UiInbox::new(),
         }
     }
 }
@@ -125,7 +122,7 @@ impl LoadSnapshots for GHArtifactLoader {
                 let client = state.github_auth.client();
                 let artifact = self.artifact.clone();
                 hello_egui_utils::spawn(async move {
-                    client
+                    let _ = client
                         .actions()
                         .create_workflow_dispatch(
                             artifact.repo.owner,

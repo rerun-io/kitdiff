@@ -209,7 +209,7 @@ impl AppState {
     pub fn handle(&mut self, ctx: &Context, command: SystemCommand) {
         match command {
             SystemCommand::Open(source) => {
-                let loader = source.load(ctx.clone(), self);
+                let loader = source.load(ctx, self);
                 self.page = Page::DiffViewer(ViewerState {
                     filter: String::new(),
                     index: 0,
@@ -249,7 +249,7 @@ impl AppState {
 }
 
 impl ViewerState {
-    pub fn handle(&mut self, ctx: &Context, command: ViewerSystemCommand) {
+    pub fn handle(&mut self, _ctx: &Context, command: ViewerSystemCommand) {
         match command {
             ViewerSystemCommand::SetFilter(filter) => {
                 self.filter = filter;

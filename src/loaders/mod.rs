@@ -16,6 +16,7 @@ pub trait LoadSnapshots {
     /// State is separate so that snapshots can be streamed in
     fn state(&self) -> Poll<Result<(), &anyhow::Error>>;
 
+    #[allow(unused_variables)]
     fn extra_ui(&self, ui: &mut egui::Ui, state: &AppStateRef<'_>) {}
 
     fn files_header(&self) -> String;
@@ -23,6 +24,7 @@ pub trait LoadSnapshots {
 
 pub type SnapshotLoader = Box<dyn LoadSnapshots + Send + Sync>;
 
+#[derive(Debug, Clone)]
 pub enum DataReference {
     Url(String),
     Data(bytes::Bytes, String),

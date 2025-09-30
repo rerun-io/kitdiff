@@ -16,7 +16,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(cc: &eframe::CreationContext, source: Option<DiffSource>, config: Config) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>, source: Option<DiffSource>, config: Config) -> Self {
         re_ui::apply_style_and_install_loaders(&cc.egui_ctx);
 
         let settings: Settings = cc
@@ -29,31 +29,6 @@ impl App {
         install_image_loaders(&cc.egui_ctx);
         let diff_loader = Arc::new(DiffImageLoader::default());
         cc.egui_ctx.add_image_loader(diff_loader.clone());
-
-        let ctx = cc.egui_ctx.clone();
-
-        // if let Some(source) = source {
-        //     match source {
-        //         // TODO: This kinda sucks, maybe sources should just have an UI?
-        //         DiffSource::Pr(pr) => {
-        //             if let Ok((user, repo, pr_number)) = parse_github_pr_url(&pr) {
-        //                 let auth_token = settings.auth().map(|auth| auth.provider_token.clone());
-        //                 github_pr = Some(GithubPr::new(
-        //                     user,
-        //                     repo,
-        //                     pr_number,
-        //                     ctx.clone(),
-        //                     auth_token,
-        //                 ));
-        //             } else {
-        //                 eprintln!("Invalid GitHub PR URL");
-        //             }
-        //         }
-        //         source => {
-        //             source.load(sender.clone(), ctx, settings.auth());
-        //         }
-        //     }
-        // }
 
         let inbox = UiInbox::new();
 

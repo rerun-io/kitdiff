@@ -26,9 +26,8 @@ impl FileReference {
         match self {
             Self::Path(path) => format!("file://{}", path.display()),
             Self::Source(source) => match source {
-                ImageSource::Uri(uri) => uri.to_string(),
-                ImageSource::Bytes { uri, .. } => uri.to_string(),
-                _ => "unknown://unknown".to_owned(),
+                ImageSource::Bytes { uri, .. } | ImageSource::Uri(uri) => uri.to_string(),
+                ImageSource::Texture(_) => "unknown://unknown".to_owned(),
             },
         }
     }
@@ -85,13 +84,12 @@ impl Snapshot {
             })
     }
 
-    fn make_image(
-        &self,
-        state: &AppStateRef<'_>,
+    fn make_image<'a>(
+        state: &AppStateRef<'a>,
         uri: String,
         opacity: f32,
         show_all: bool,
-    ) -> eframe::egui::Image {
+    ) -> eframe::egui::Image<'a> {
         let mut image = eframe::egui::Image::new(uri)
             .texture_options(eframe::egui::TextureOptions {
                 magnification: state.settings.texture_magnification,
@@ -112,7 +110,7 @@ impl Snapshot {
         image
     }
 
-    pub fn old_image(&self, state: &AppStateRef<'_>) -> Option<eframe::egui::Image> {
+    pub fn old_image<'a>(&self, state: &AppStateRef<'a>) -> Option<eframe::egui::Image<'a>> {
         let PageRef::DiffViewer(vs) = &state.page else {
             return None;
         };
@@ -121,10 +119,10 @@ impl Snapshot {
         (show_all || show_old)
             .then(|| self.old_uri())
             .flatten()
-            .map(|uri| self.make_image(state, uri, 1.0, show_all))
+            .map(|uri| Self::make_image(state, uri, 1.0, show_all))
     }
 
-    pub fn new_image(&self, state: &AppStateRef<'_>) -> Option<eframe::egui::Image> {
+    pub fn new_image<'a>(&self, state: &AppStateRef<'a>) -> Option<eframe::egui::Image<'a>> {
         let PageRef::DiffViewer(vs) = &state.page else {
             return None;
         };
@@ -133,10 +131,10 @@ impl Snapshot {
         (show_all || show_new)
             .then(|| self.new_uri())
             .flatten()
-            .map(|new_uri| self.make_image(state, new_uri, state.settings.new_opacity, show_all))
+            .map(|new_uri| Self::make_image(state, new_uri, state.settings.new_opacity, show_all))
     }
 
-    pub fn diff_image(&self, state: &AppStateRef<'_>) -> Option<eframe::egui::Image> {
+    pub fn diff_image<'a>(&self, state: &AppStateRef<'a>) -> Option<eframe::egui::Image<'a>> {
         let PageRef::DiffViewer(vs) = &state.page else {
             return None;
         };
@@ -145,6 +143,6 @@ impl Snapshot {
         (show_all || show_diff)
             .then(|| self.diff_uri(state.settings.use_original_diff, state.settings.options))
             .flatten()
-            .map(|diff_uri| self.make_image(state, diff_uri, state.settings.diff_opacity, show_all))
+            .map(|diff_uri| Self::make_image(state, diff_uri, state.settings.diff_opacity, show_all))
     }
 }

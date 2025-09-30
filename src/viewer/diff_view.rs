@@ -31,7 +31,7 @@ pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
         let new = snapshot.new_image(state.app);
         let diff = snapshot.diff_image(state.app);
 
-        let is_loading = |maybe_image: &Option<Image>| {
+        let is_loading = |maybe_image: &Option<Image<'_>>| {
             maybe_image
                 .as_ref()
                 .map(|img| {

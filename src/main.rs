@@ -3,9 +3,9 @@ mod cli;
 
 #[cfg(not(target_arch = "wasm32"))]
 use eframe::NativeOptions;
-use kitdiff::DiffSource;
 use kitdiff::app::App;
 use kitdiff::config::Config;
+use kitdiff::{DataReference, DiffSource};
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
@@ -34,6 +34,7 @@ fn main() -> eframe::Result<()> {
 fn parse_url_query_params() -> Option<DiffSource> {
     use kitdiff::github::auth::parse_github_artifact_url;
     use kitdiff::github::pr::parse_github_pr_url;
+    use octocrab::models::ArtifactId;
 
     if let Some(window) = web_sys::window() {
         if let Ok(search) = window.location().search() {
@@ -52,30 +53,16 @@ fn parse_url_query_params() -> Option<DiffSource> {
                         }
 
                         // Try to parse as GitHub artifact URL
-                        if let Some((repo, artifact_id)) = parse_github_artifact_url(&decoded_url) {
-                            return Some(DiffSource::GHArtifact(
-                                kitdiff::github::model::GithubArtifactLink {
-                                    repo,
-                                    artifact_id: ArtifactId(artifact_id.parse().unwrap()),
-                                    name: None,
-                                    branch_name: None,
-                                    run_id: None,
-                                },
-                            ));
+                        if let Some(link) = parse_github_artifact_url(&decoded_url) {
+                            return Some(DiffSource::GHArtifact(link));
                         }
 
                         // Try to parse as direct zip/tar.gz URL
-                        if decoded_url.ends_with(".zip") {
-                            return Some(DiffSource::Zip(kitdiff::PathOrBlob::Url(
-                                decoded_url,
-                                None,
-                            )));
-                        }
-                        if decoded_url.ends_with(".tar.gz") || decoded_url.ends_with(".tgz") {
-                            return Some(DiffSource::TarGz(kitdiff::PathOrBlob::Url(
-                                decoded_url,
-                                None,
-                            )));
+                        if decoded_url.ends_with(".zip")
+                            || decoded_url.ends_with(".tar.gz")
+                            || decoded_url.ends_with(".tgz")
+                        {
+                            return Some(DiffSource::Archive(DataReference::Url(decoded_url)));
                         }
                     }
                 }

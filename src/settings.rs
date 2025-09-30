@@ -1,5 +1,5 @@
 use crate::diff_image_loader::DiffOptions;
-use crate::github::auth::{AuthState, LoggedInState};
+use crate::github::auth::AuthState;
 use eframe::egui::TextureFilter;
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -17,19 +17,6 @@ pub struct Settings {
     pub use_original_diff: bool,
     pub options: DiffOptions,
     pub auth: AuthState,
-}
-
-impl Settings {
-    fn auth(&self) -> Option<&LoggedInState> {
-        #[cfg(target_arch = "wasm32")]
-        {
-            self.auth.logged_in.as_ref()
-        }
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            None
-        }
-    }
 }
 
 impl Default for Settings {

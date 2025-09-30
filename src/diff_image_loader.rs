@@ -116,14 +116,14 @@ impl ImageLoader for DiffImageLoader {
                 #[cfg(not(target_arch = "wasm32"))]
                 std::thread::spawn(move || {
                     ctx.request_repaint();
-                    let result = load_diffs(&ctx, old_image, new_image, size_hint, diff_uri);
+                    let result = load_diffs(&ctx, &old_image, &new_image, size_hint, &diff_uri);
                     cache.lock().insert(uri, result.map(Poll::Ready));
                 });
                 #[cfg(target_arch = "wasm32")]
                 {
                     wasm_bindgen_futures::spawn_local(async move {
                         ctx.request_repaint();
-                        let result = load_diffs(&ctx, old_image, new_image, size_hint, diff_uri);
+                        let result = load_diffs(&ctx, &old_image, &new_image, size_hint, &diff_uri);
                         cache.lock().insert(uri, result.map(Poll::Ready));
                     });
                 }
@@ -155,11 +155,11 @@ impl ImageLoader for DiffImageLoader {
 }
 
 pub fn load_diffs(
-    ctx: &Context,
-    old_img: Arc<ColorImage>,
-    new_img: Arc<ColorImage>,
-    size_hint: SizeHint,
-    diff_uri: DiffUri,
+    _ctx: &Context,
+    old_img: &ColorImage,
+    new_img: &ColorImage,
+    _size_hint: SizeHint,
+    diff_uri: &DiffUri,
 ) -> Result<DiffInfo, LoadError> {
     let old = image::RgbaImage::from_vec(
         old_img.width() as u32,

@@ -3,7 +3,7 @@ use eframe::egui;
 use eframe::egui::{Button, Context, ScrollArea, Spinner};
 use egui_inbox::UiInbox;
 use futures::stream::FuturesUnordered;
-use futures::{StreamExt as _, TryStreamExt as _};
+use futures::TryStreamExt as _;
 use graphql_client::GraphQLQuery;
 use octocrab::Octocrab;
 use re_ui::egui_ext::boxed_widget::BoxedWidgetLocalExt as _;
@@ -50,7 +50,7 @@ pub fn parse_github_pr_url(url: &str) -> Result<(String, String, u32), String> {
 
     let user = parts[0].to_owned();
     let repo = parts[1].to_owned();
-    let pr_number = parts[3].parse::<u32>().map_err(|_| "Invalid PR number")?;
+    let pr_number = parts[3].parse::<u32>().map_err(|_err| "Invalid PR number")?;
 
     Ok((user, repo, pr_number))
 }
@@ -92,16 +92,17 @@ pub struct GithubPr {
 }
 
 #[derive(Debug)]
-struct PrWithCommits {
+pub(crate) struct PrWithCommits {
     title: String,
     head_branch: String,
+    #[allow(dead_code)]
     base_branch: String,
     commits: Vec<CommitData>,
     artifacts: HashMap<String, Poll<Result<Vec<ArtifactData>>>>,
 }
 
 #[derive(Debug)]
-struct ArtifactData {
+pub(crate) struct ArtifactData {
     data: WorkflowListArtifact,
     run_id: RunId,
 }
@@ -239,7 +240,7 @@ async fn get_pr_commits(repo: &RepoClient, pr: PrNumber) -> Result<PrWithCommits
                 }
             }
 
-            for (workflow_id, suite) in last_suite_per_workflow {
+            for (_workflow_id, suite) in last_suite_per_workflow {
                 let pending = match suite.status {
                     pr_details_query::CheckStatusState::COMPLETED => false,
                     pr_details_query::CheckStatusState::IN_PROGRESS => true,
@@ -339,7 +340,6 @@ pub fn pr_ui(ui: &mut egui::Ui, state: &AppStateRef<'_>, pr: &GithubPr) {
                                     .tint(ui.tokens().alert_success.icon),
                             )
                             .boxed_local(),
-                            _ => Button::image(icons::HELP.as_image()).boxed_local(),
                         };
 
                         let button = button.on_menu(|ui| {
@@ -362,6 +362,7 @@ pub fn pr_ui(ui: &mut egui::Ui, state: &AppStateRef<'_>, pr: &GithubPr) {
                                         format!("Error: {error}"),
                                     );
                                 }
+                                #[expect(clippy::excessive_nesting)]
                                 Some(Poll::Ready(Ok(artifacts))) => {
                                     if artifacts.is_empty() {
                                         ui.label("No artifacts found");
@@ -399,7 +400,7 @@ pub fn pr_ui(ui: &mut egui::Ui, state: &AppStateRef<'_>, pr: &GithubPr) {
         Poll::Pending => {
             SectionCollapsingHeader::new(format!("PR: {}", pr.link))
                 .with_button(Spinner::new())
-                .show(ui, |ui| {});
+                .show(ui, |_ui| {});
             ui.spinner();
         }
     });

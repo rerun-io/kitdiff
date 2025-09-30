@@ -9,7 +9,7 @@ pub fn bar(ctx: &Context, state: &AppStateRef<'_>) {
         .show(ctx, |ui| {
             egui::Sides::new().show(
                 ui,
-                |ui| {},
+                |_ui| {},
                 |ui| {
                     auth_ui(ui, state);
                 },

@@ -21,7 +21,7 @@ pub enum Commands {
     /// Compare images between PR branches from GitHub PR URL (needs to be run from within the repo)
     Pr { url: String },
     /// Load and compare snapshot files from a zip archive (URL or local file)
-    Zip { source: String },
+    Archive { source: String },
     /// Load and compare snapshot files from a GitHub artifact
     GhArtifact { url: String },
 }
@@ -37,63 +37,27 @@ impl Commands {
             }
             Self::Pr { url } => {
                 // Check if the PR URL is actually a GitHub artifact URL
-                if let Some((repo, artifact_id)) = parse_github_artifact_url(url) {
-                    DiffSource::GHArtifact(GithubArtifactLink {
-                        repo,
-                        artifact_id: ArtifactId(artifact_id.parse().unwrap()),
-                        name: None,
-                        branch_name: None,
-                        run_id: None,
-                    })
+                if let Some(link) = parse_github_artifact_url(url) {
+                    DiffSource::GHArtifact(link)
                 } else if let Ok(parsed_url) = url.parse() {
                     DiffSource::Pr(parsed_url)
                 } else {
                     panic!("Invalid GitHub PR URL: {url}");
                 }
             }
-            Self::Zip { source } => {
-                // // Check if it's a GitHub artifact URL first
-                // if let Some((repo, artifact_id)) = parse_github_artifact_url(source) {
-                //     DiffSource::GHArtifact {
-                //         owner,
-                //         repo,
-                //         artifact_id,
-                //     }
-                // } else if source.starts_with("http://") || source.starts_with("https://") {
-                //     #[cfg(target_arch = "wasm32")]
-                //     {
-                //         if source.ends_with(".tar.gz") || source.ends_with(".tgz") {
-                //             DiffSource::TarGz(kitdiff::PathOrBlob::Url(source.clone(), None))
-                //         } else {
-                //             DiffSource::Zip(kitdiff::PathOrBlob::Url(source.clone(), None))
-                //         }
-                //     }
-                //     #[cfg(not(target_arch = "wasm32"))]
-                //     {
-                //         panic!(
-                //             "URL sources not supported on native platforms. Use 'gh-artifact' command for GitHub artifacts or download and provide a local file path."
-                //         );
-                //     }
-                // } else {
-                //     if source.ends_with(".tar.gz") || source.ends_with(".tgz") {
-                //         DiffSource::TarGz(kitdiff::PathOrBlob::Path(source.clone().into()))
-                //     } else {
-                //         DiffSource::Zip(kitdiff::PathOrBlob::Path(source.clone().into()))
-                //     }
-                // }
-                todo!()
+            Self::Archive { source } => {
+                if source.starts_with("http://") || source.starts_with("https://") {
+                    DiffSource::Archive(kitdiff::DataReference::Url(source.clone()))
+                } else {
+                    DiffSource::Archive(kitdiff::DataReference::Path(source.clone().into()))
+                }
             }
             Self::GhArtifact { url } => {
-                // if let Some((owner, repo, artifact_id)) = parse_github_artifact_url(url) {
-                //     DiffSource::GHArtifact {
-                //         owner,
-                //         repo,
-                //         artifact_id,
-                //     }
-                // } else {
-                //     panic!("Invalid GitHub artifact URL: {}", url);
-                // }
-                todo!()
+                if let Some(link) = parse_github_artifact_url(url) {
+                    DiffSource::GHArtifact(link)
+                } else {
+                    panic!("Invalid GitHub artifact URL: {}", url);
+                }
             }
         }
     }

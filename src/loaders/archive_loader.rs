@@ -13,8 +13,6 @@ use std::task::Poll;
 use tar::Archive;
 use zip::ZipArchive;
 
-type Sender = UiInboxSender<Result<Vec<Snapshot>>>;
-
 #[derive(Debug)]
 pub struct ArchiveLoader {
     data: Poll<anyhow::Result<Vec<Snapshot>>>,

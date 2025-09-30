@@ -1,7 +1,8 @@
-use crate::github::model::GithubRepoLink;
+use crate::github::model::{GithubArtifactLink, GithubRepoLink};
 use crate::state::SystemCommand;
 use eframe::egui;
 use ehttp;
+use octocrab::models::ArtifactId;
 use serde_json;
 use std::fmt;
 use std::sync::mpsc;
@@ -107,7 +108,7 @@ fn get_current_timestamp() -> u64 {
 }
 
 // URL parsing utilities
-pub fn parse_github_artifact_url(url: &str) -> Option<(GithubRepoLink, String)> {
+pub fn parse_github_artifact_url(url: &str) -> Option<GithubArtifactLink> {
     // Expected format: github.com/owner/repo/actions/runs/12345/artifacts/67890
     let url = url
         .trim_start_matches("https://")
@@ -123,10 +124,13 @@ pub fn parse_github_artifact_url(url: &str) -> Option<(GithubRepoLink, String)> 
     {
         let owner = parts[1].to_owned();
         let repo = parts[2].to_owned();
-        Some((
-            GithubRepoLink { owner, repo },
-            parts[7].to_owned(), // artifact_id
-        ))
+        Some(GithubArtifactLink {
+            repo: GithubRepoLink { owner, repo },
+            artifact_id: ArtifactId(parts[7].parse().ok()?),
+            name: None,
+            branch_name: None,
+            run_id: None,
+        })
     } else {
         None
     }
