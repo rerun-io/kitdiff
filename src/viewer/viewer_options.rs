@@ -1,6 +1,6 @@
 use crate::settings::ImageMode;
 use crate::state::{SystemCommand, ViewerAppStateRef, ViewerSystemCommand};
-use eframe::egui::{Key, KeyboardShortcut, Modifiers, Slider, TextureFilter, Ui};
+use eframe::egui::{Checkbox, Key, KeyboardShortcut, Modifiers, Slider, TextureFilter, Ui};
 
 pub fn viewer_options(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
     let mut settings = state.app.settings.clone();
@@ -8,6 +8,10 @@ pub fn viewer_options(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
     ui.group(|ui| {
         ui.strong("View only");
         let mut view_filter = state.view_filter;
+        ui.add_enabled(
+            false,
+            Checkbox::new(&mut state.view_filter.all(), "All with opacity"),
+        );
         ui.checkbox(&mut view_filter.show_old, "Old (1)");
         ui.checkbox(&mut view_filter.show_new, "New (2)");
         ui.checkbox(&mut view_filter.show_diff, "Diff (3)");
@@ -18,8 +22,10 @@ pub fn viewer_options(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
         }
     });
 
-    ui.add(Slider::new(&mut settings.new_opacity, 0.0..=1.0).text("New Opacity"));
-    ui.add(Slider::new(&mut settings.diff_opacity, 0.0..=1.0).text("Diff Opacity"));
+    ui.add_enabled_ui(state.view_filter.all(), |ui| {
+        ui.add(Slider::new(&mut settings.new_opacity, 0.0..=1.0).text("New Opacity"));
+        ui.add(Slider::new(&mut settings.diff_opacity, 0.0..=1.0).text("Diff Opacity"));
+    });
 
     let mut filtered_index = state.active_filtered_index;
 
@@ -60,12 +66,14 @@ pub fn viewer_options(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
             "Use original diff if available",
         );
 
-        ui.add(
-            Slider::new(&mut settings.options.threshold, 0.01..=1000.0)
-                .logarithmic(true)
-                .text("Diff Threshold"),
-        );
-        ui.checkbox(&mut settings.options.detect_aa_pixels, "Detect AA Pixels");
+        ui.add_enabled_ui(!settings.use_original_diff, |ui| {
+            ui.add(
+                Slider::new(&mut settings.options.threshold, 0.01..=1000.0)
+                    .logarithmic(true)
+                    .text("Diff Threshold"),
+            );
+            ui.checkbox(&mut settings.options.detect_aa_pixels, "Detect AA Pixels");
+        });
     });
 
     if settings != state.app.settings {
