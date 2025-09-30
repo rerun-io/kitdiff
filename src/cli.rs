@@ -1,8 +1,8 @@
 use clap::{Parser, Subcommand};
 use kitdiff::DiffSource;
-use octocrab::models::ArtifactId;
 use kitdiff::github::auth::parse_github_artifact_url;
 use kitdiff::github::model::GithubArtifactLink;
+use octocrab::models::ArtifactId;
 
 #[derive(Parser)]
 #[command(name = "kitdiff")]
@@ -17,7 +17,7 @@ pub enum Commands {
     /// Compare snapshot test files (.png with .old/.new/.diff variants) (default)
     Files { directory: Option<String> },
     /// Compare images between current branch and default branch
-    Git,
+    Git { repo_path: Option<String> },
     /// Compare images between PR branches from GitHub PR URL (needs to be run from within the repo)
     Pr { url: String },
     /// Load and compare snapshot files from a zip archive (URL or local file)
@@ -32,7 +32,9 @@ impl Commands {
             Commands::Files { directory } => {
                 DiffSource::Files(directory.clone().unwrap_or_else(|| ".".into()).into())
             }
-            Commands::Git => DiffSource::Git,
+            Commands::Git { repo_path } => {
+                DiffSource::Git(repo_path.clone().unwrap_or_else(|| ".".into()).into())
+            }
             Commands::Pr { url } => {
                 // Check if the PR URL is actually a GitHub artifact URL
                 if let Some((repo, artifact_id)) = parse_github_artifact_url(url) {
@@ -40,6 +42,8 @@ impl Commands {
                         repo,
                         artifact_id: ArtifactId(artifact_id.parse().unwrap()),
                         name: None,
+                        branch_name: None,
+                        run_id: None,
                     })
                 } else {
                     if let Ok(parsed_url) = url.parse() {

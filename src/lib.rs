@@ -1,13 +1,17 @@
+use crate::github::model::{GithubArtifactLink, GithubPrLink};
 use crate::loaders::SnapshotLoader;
+use crate::state::AppState;
 use eframe::egui::Context;
 use eframe::egui::load::Bytes;
 use std::any::Any;
 use std::path::PathBuf;
-use crate::github::model::{GithubArtifactLink, GithubPrLink};
-use crate::state::AppState;
 
 pub mod app;
+mod bar;
+pub mod config;
 pub mod diff_image_loader;
+pub mod github;
+mod home;
 pub mod loaders;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod native_loaders;
@@ -15,17 +19,13 @@ mod settings;
 pub mod snapshot;
 mod state;
 mod viewer;
-mod home;
-mod bar;
-pub mod github;
-pub mod config;
 
 #[derive(Debug, Clone)]
 pub enum DiffSource {
     #[cfg(not(target_arch = "wasm32"))]
     Files(PathBuf),
     #[cfg(not(target_arch = "wasm32"))]
-    Git,
+    Git(PathBuf),
     Pr(GithubPrLink),
     GHArtifact(GithubArtifactLink),
     Zip(PathOrBlob),
@@ -33,25 +33,16 @@ pub enum DiffSource {
 }
 
 impl DiffSource {
-    pub fn load(
-        self,
-        ctx: Context,
-        state: &AppState,
-    ) -> SnapshotLoader {
+    pub fn load(self, ctx: Context, state: &AppState) -> SnapshotLoader {
         match self {
             #[cfg(not(target_arch = "wasm32"))]
-            DiffSource::Files(path) => {
-                Box::new(native_loaders::file_loader::FileLoader::new(path))
-            }
-            // #[cfg(not(target_arch = "wasm32"))]
-            // DiffSource::Git => {
-            //     native_loaders::git_loader::git_discovery(tx, ctx)
-            //         .expect("Failed to run git discovery");
-            //     None
-            // }
-            DiffSource::Pr(url) => {
-                Box::new(loaders::pr_loader::PrLoader::new(url, state.github_auth.client()))
-            }
+            DiffSource::Files(path) => Box::new(native_loaders::file_loader::FileLoader::new(path)),
+            #[cfg(not(target_arch = "wasm32"))]
+            DiffSource::Git(path) => Box::new(native_loaders::git_loader::GitLoader::new(path)),
+            DiffSource::Pr(url) => Box::new(loaders::pr_loader::PrLoader::new(
+                url,
+                state.github_auth.client(),
+            )),
             DiffSource::GHArtifact(artifact) => {
                 Box::new(loaders::gh_archive_loader::GHArtifactLoader::new(
                     state.github_auth.client(),
@@ -185,7 +176,7 @@ impl DiffSource {
             //         None
             //     }
             // }
-            _ => todo!()
+            _ => todo!(),
         }
     }
 }

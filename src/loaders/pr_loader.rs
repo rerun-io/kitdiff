@@ -1,24 +1,25 @@
-use crate::loaders::{LoadSnapshots, SnapshotLoader};
+use crate::github::model::{GithubPrLink, GithubRepoLink};
 use crate::github::octokit::RepoClient;
+use crate::github::pr::{GithubPr, pr_ui};
+use crate::loaders::{LoadSnapshots, SnapshotLoader, sort_snapshots};
 use crate::snapshot::{FileReference, Snapshot};
 use crate::state::AppStateRef;
-use anyhow::Error;
 use eframe::egui::{Context, Ui};
 use egui_inbox::{UiInbox, UiInboxSender};
 use futures::StreamExt;
-use octocrab::Octocrab;
 use octocrab::models::repos::{DiffEntry, DiffEntryStatus};
+use octocrab::{Error, Octocrab, Result};
 use std::ops::Deref;
 use std::path::Path;
 use std::pin::pin;
 use std::task::Poll;
-use crate::github::model::{GithubPrLink, GithubRepoLink};
-use crate::github::pr::{pr_ui, GithubPr};
+
+type Sender = UiInboxSender<Option<Result<Snapshot>>>;
 
 pub struct PrLoader {
     snapshots: Vec<Snapshot>,
-    inbox: UiInbox<Option<Snapshot>>,
-    loading: bool,
+    inbox: UiInbox<Option<Result<Snapshot>>>,
+    state: Poll<anyhow::Result<()>>,
     link: GithubPrLink,
     pr_info: GithubPr,
 }
@@ -29,16 +30,21 @@ impl PrLoader {
         let repo_client = RepoClient::new(client.clone(), link.repo.clone());
 
         inbox.spawn(|tx| async move {
-            let result = stream_files(repo_client, link.pr_number, tx).await;
-            if let Err(e) = result {
-                eprintln!("Error loading PR files: {}", e);
+            let result = stream_files(repo_client, link.pr_number, tx.clone()).await;
+            match result {
+                Ok(()) => {
+                    tx.send(None).ok();
+                }
+                Err(err) => {
+                    tx.send(Some(Err(err))).ok();
+                }
             }
         });
 
         Self {
             snapshots: Vec::new(),
             inbox,
-            loading: true,
+            state: Poll::Pending,
             pr_info: GithubPr::new(link.clone(), client),
             link,
         }
@@ -48,7 +54,7 @@ impl PrLoader {
 async fn stream_files(
     repo_client: RepoClient,
     pr_number: u64,
-    sender: UiInboxSender<Option<Snapshot>>,
+    sender: Sender,
 ) -> octocrab::Result<()> {
     let pr = repo_client.pulls().get(pr_number).await?;
 
@@ -91,11 +97,9 @@ async fn stream_files(
                 new: new_url.map(|url| FileReference::Source(url.into())),
                 diff: None,
             };
-            sender.send(Some(snapshot)).ok();
+            sender.send(Some(Ok(snapshot))).ok();
         }
     }
-
-    sender.send(None).ok();
 
     Ok(())
 }
@@ -111,12 +115,16 @@ impl LoadSnapshots for PrLoader {
     fn update(&mut self, ctx: &Context) {
         for snapshot in self.inbox.read(ctx) {
             match snapshot {
-                Some(s) => {
+                Some(Ok(s)) => {
                     self.snapshots.push(s);
-                    self.snapshots
-                        .sort_by_key(|s| s.path.to_string_lossy().to_lowercase());
+                    sort_snapshots(&mut self.snapshots);
                 }
-                None => self.loading = false,
+                Some(Err(e)) => {
+                    self.state = Poll::Ready(Err(e.into()));
+                }
+                None => {
+                    self.state = Poll::Ready(Ok(()));
+                }
             }
         }
         self.pr_info.update(ctx);
@@ -126,11 +134,11 @@ impl LoadSnapshots for PrLoader {
         &self.snapshots
     }
 
-    fn state(&self) -> Poll<Result<(), &Error>> {
-        if self.loading {
-            Poll::Pending
-        } else {
-            Poll::Ready(Ok(()))
+    fn state(&self) -> Poll<Result<(), &anyhow::Error>> {
+        match &self.state {
+            Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
+            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
+            Poll::Pending => Poll::Pending,
         }
     }
 

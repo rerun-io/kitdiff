@@ -58,3 +58,7 @@ impl DataReference {
         }
     }
 }
+
+pub fn sort_snapshots(snapshots: &mut [Snapshot]) {
+    snapshots.sort_by_key(|s| s.path.to_string_lossy().to_lowercase());
+}

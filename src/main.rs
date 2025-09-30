@@ -5,8 +5,8 @@ mod cli;
 use eframe::NativeOptions;
 use kitdiff::DiffSource;
 use kitdiff::app::App;
-use octocrab::models::ArtifactId;
 use kitdiff::config::Config;
+use octocrab::models::ArtifactId;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
@@ -27,7 +27,7 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "kitdiff",
         NativeOptions::default(),
-        Box::new(move |cc| Ok(Box::new(App::new(cc, Some(source))))),
+        Box::new(move |cc| Ok(Box::new(App::new(cc, Some(source), Config::default())))),
     )
 }
 
@@ -54,13 +54,15 @@ fn parse_url_query_params() -> Option<DiffSource> {
 
                         // Try to parse as GitHub artifact URL
                         if let Some((repo, artifact_id)) = parse_github_artifact_url(&decoded_url) {
-                            return Some(DiffSource::GHArtifact(kitdiff::github::model::GithubArtifactLink {
-                                repo,
-                                artifact_id: ArtifactId(artifact_id.parse().unwrap()),
-                                name: None,
-                                branch_name: None,
-                                run_id: None,
-                            }));
+                            return Some(DiffSource::GHArtifact(
+                                kitdiff::github::model::GithubArtifactLink {
+                                    repo,
+                                    artifact_id: ArtifactId(artifact_id.parse().unwrap()),
+                                    name: None,
+                                    branch_name: None,
+                                    run_id: None,
+                                },
+                            ));
                         }
 
                         // Try to parse as direct zip/tar.gz URL
