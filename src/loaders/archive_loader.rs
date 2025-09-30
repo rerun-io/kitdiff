@@ -3,7 +3,7 @@ use crate::snapshot::{FileReference, Snapshot};
 use anyhow::{Error, Result};
 use bytes::Bytes;
 use eframe::egui::{Context, ImageSource};
-use egui_inbox::{UiInbox, UiInboxSender};
+use egui_inbox::UiInbox;
 use flate2::read::GzDecoder;
 use std::borrow::Cow;
 use std::collections::HashMap;

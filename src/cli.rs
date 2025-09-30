@@ -1,8 +1,6 @@
 use clap::{Parser, Subcommand};
 use kitdiff::DiffSource;
 use kitdiff::github::auth::parse_github_artifact_url;
-use kitdiff::github::model::GithubArtifactLink;
-use octocrab::models::ArtifactId;
 
 #[derive(Parser)]
 #[command(name = "kitdiff")]
@@ -56,7 +54,7 @@ impl Commands {
                 if let Some(link) = parse_github_artifact_url(url) {
                     DiffSource::GHArtifact(link)
                 } else {
-                    panic!("Invalid GitHub artifact URL: {}", url);
+                    panic!("Invalid GitHub artifact URL: {url}");
                 }
             }
         }

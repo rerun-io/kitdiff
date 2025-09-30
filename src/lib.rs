@@ -2,10 +2,7 @@ use crate::github::model::{GithubArtifactLink, GithubPrLink};
 pub use crate::loaders::{DataReference, SnapshotLoader};
 use crate::state::AppState;
 use eframe::egui::Context;
-use eframe::egui::load::Bytes;
-use std::any::Any;
 use std::path::PathBuf;
-use crate::snapshot::FileReference;
 
 pub mod app;
 mod bar;

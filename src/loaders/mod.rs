@@ -16,7 +16,7 @@ pub trait LoadSnapshots {
     /// State is separate so that snapshots can be streamed in
     fn state(&self) -> Poll<Result<(), &anyhow::Error>>;
 
-    #[allow(unused_variables)]
+    #[expect(unused_variables)]
     fn extra_ui(&self, ui: &mut egui::Ui, state: &AppStateRef<'_>) {}
 
     fn files_header(&self) -> String;

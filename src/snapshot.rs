@@ -143,6 +143,8 @@ impl Snapshot {
         (show_all || show_diff)
             .then(|| self.diff_uri(state.settings.use_original_diff, state.settings.options))
             .flatten()
-            .map(|diff_uri| Self::make_image(state, diff_uri, state.settings.diff_opacity, show_all))
+            .map(|diff_uri| {
+                Self::make_image(state, diff_uri, state.settings.diff_opacity, show_all)
+            })
     }
 }

@@ -2,8 +2,8 @@ use crate::DiffSource;
 use eframe::egui;
 use eframe::egui::{Button, Context, ScrollArea, Spinner};
 use egui_inbox::UiInbox;
-use futures::stream::FuturesUnordered;
 use futures::TryStreamExt as _;
+use futures::stream::FuturesUnordered;
 use graphql_client::GraphQLQuery;
 use octocrab::Octocrab;
 use re_ui::egui_ext::boxed_widget::BoxedWidgetLocalExt as _;
@@ -50,7 +50,9 @@ pub fn parse_github_pr_url(url: &str) -> Result<(String, String, u32), String> {
 
     let user = parts[0].to_owned();
     let repo = parts[1].to_owned();
-    let pr_number = parts[3].parse::<u32>().map_err(|_err| "Invalid PR number")?;
+    let pr_number = parts[3]
+        .parse::<u32>()
+        .map_err(|_err| "Invalid PR number")?;
 
     Ok((user, repo, pr_number))
 }
@@ -95,7 +97,7 @@ pub struct GithubPr {
 pub(crate) struct PrWithCommits {
     title: String,
     head_branch: String,
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     base_branch: String,
     commits: Vec<CommitData>,
     artifacts: HashMap<String, Poll<Result<Vec<ArtifactData>>>>,

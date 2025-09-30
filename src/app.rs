@@ -16,7 +16,11 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(cc: &eframe::CreationContext<'_>, source: Option<DiffSource>, config: Config) -> Self {
+    pub fn new(
+        cc: &eframe::CreationContext<'_>,
+        source: Option<DiffSource>,
+        config: Config,
+    ) -> Self {
         re_ui::apply_style_and_install_loaders(&cc.egui_ctx);
 
         let settings: Settings = cc

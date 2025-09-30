@@ -3,9 +3,9 @@ mod cli;
 
 #[cfg(not(target_arch = "wasm32"))]
 use eframe::NativeOptions;
+use kitdiff::DiffSource;
 use kitdiff::app::App;
 use kitdiff::config::Config;
-use kitdiff::{DataReference, DiffSource};
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
