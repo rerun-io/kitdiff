@@ -94,7 +94,7 @@ pub struct GithubPr {
 }
 
 #[derive(Debug)]
-pub(crate) struct PrWithCommits {
+pub struct PrWithCommits {
     title: String,
     head_branch: String,
     #[expect(dead_code)]
@@ -104,7 +104,7 @@ pub(crate) struct PrWithCommits {
 }
 
 #[derive(Debug)]
-pub(crate) struct ArtifactData {
+pub struct ArtifactData {
     data: WorkflowListArtifact,
     run_id: RunId,
 }

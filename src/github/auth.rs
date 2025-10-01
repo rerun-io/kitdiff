@@ -1,11 +1,20 @@
 use crate::github::model::{GithubArtifactLink, GithubRepoLink};
 use crate::state::SystemCommand;
 use eframe::egui;
+use eframe::egui::{Context, ViewportCommand};
+use egui_inbox::{UiInbox, UiInboxSender};
 use ehttp;
-use octocrab::models::ArtifactId;
+use octocrab::models::{ArtifactId, Author};
 use serde_json;
 use std::fmt;
 use std::sync::mpsc;
+
+#[cfg(target_arch = "wasm32")]
+#[path = "auth/wasm.rs"]
+mod auth_impl;
+#[cfg(not(target_arch = "wasm32"))]
+#[path = "auth/native.rs"]
+mod auth_impl;
 
 pub enum GithubAuthCommand {
     Login,
@@ -34,11 +43,8 @@ pub struct LoggedInState {
 
 #[derive(Debug)]
 pub struct GitHubAuth {
-    supabase_url: String,
-    supabase_anon_key: String,
     state: AuthState,
-    auth_sender: AuthSender,
-    auth_receiver: AuthReceiver,
+    inbox: UiInbox<AuthEvent>,
 }
 
 impl GitHubAuth {
@@ -61,34 +67,13 @@ impl GitHubAuth {
     }
 }
 
-#[derive(Debug)]
-pub enum AuthError {
-    NetworkError(String),
-    ParseError(String),
-    AuthenticationError(String),
-}
-
-impl fmt::Display for AuthError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::NetworkError(msg) => write!(f, "Network error: {msg}"),
-            Self::ParseError(msg) => write!(f, "Parse error: {msg}"),
-            Self::AuthenticationError(msg) => write!(f, "Authentication error: {msg}"),
-        }
-    }
-}
-
-impl std::error::Error for AuthError {}
-
 #[derive(Debug, Clone)]
 pub enum AuthEvent {
     LoginSuccessful(AuthState),
-    LogoutCompleted,
     Error(String),
 }
 
-pub type AuthSender = mpsc::Sender<AuthEvent>;
-pub type AuthReceiver = mpsc::Receiver<AuthEvent>;
+pub type AuthSender = UiInboxSender<AuthEvent>;
 
 // Helper function to get current timestamp in seconds
 fn get_current_timestamp() -> u64 {
@@ -140,170 +125,93 @@ pub fn github_artifact_api_url(owner: &str, repo: &str, artifact_id: &str) -> St
     format!("https://api.github.com/repos/{owner}/{repo}/actions/artifacts/{artifact_id}/zip")
 }
 
+#[derive(serde::Deserialize)]
+struct AuthFragment {
+    access_token: String,
+    provider_token: String, // The github token
+    expires_at: u64,
+}
+
+fn parse_supabase_fragment(fragment: &str) -> anyhow::Result<AuthFragment> {
+    Ok(serde_urlencoded::from_str(fragment)?)
+}
+
 impl GitHubAuth {
+    pub const SUPABASE_URL: &'static str = "https://fqhsaeyjqrjmlkqflvho.supabase.co";
+    pub const SUPABASE_ANON_KEY: &'static str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxaHNhZXlqcXJqbWxrcWZsdmhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgyMTk4MzIsImV4cCI6MjA3Mzc5NTgzMn0.TuhMjHhBCNyKquyVWq3djOfpBVDhcpSmNRWSErpseuw";
+
     pub fn new(state: AuthState) -> Self {
-        // Supabase configuration
-        let supabase_url = "https://fqhsaeyjqrjmlkqflvho.supabase.co".to_owned(); // Replace with your project
-        let supabase_anon_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxaHNhZXlqcXJqbWxrcWZsdmhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgyMTk4MzIsImV4cCI6MjA3Mzc5NTgzMn0.TuhMjHhBCNyKquyVWq3djOfpBVDhcpSmNRWSErpseuw".to_owned(); // Replace with your anon key
-
-        let (auth_sender, auth_receiver) = mpsc::channel();
-
         let mut this = Self {
-            supabase_url,
-            supabase_anon_key,
             state,
-            auth_sender,
-            auth_receiver,
+            inbox: UiInbox::new(),
         };
 
-        this.check_for_auth_callback();
+        auth_impl::check_for_auth_callback(this.inbox.sender());
 
         this
     }
 
-    pub fn handle(&mut self, cmd: GithubAuthCommand) {
+    pub fn handle(&mut self, ctx: &Context, cmd: GithubAuthCommand) {
         match cmd {
-            GithubAuthCommand::Login => {
-                self.login_github();
-            }
+            GithubAuthCommand::Login => auth_impl::login_github(&ctx, self.inbox.sender()),
             GithubAuthCommand::Logout => {
                 self.logout();
             }
         }
     }
 
-    pub fn login_github(&self) {
-        #[cfg(target_arch = "wasm32")]
-        {
-            if let Some(window) = web_sys::window() {
-                if let Ok(origin) = window.location().href() {
-                    let auth_url = format!(
-                        "{}/auth/v1/authorize?provider=github&redirect_to={}&scopes=repo",
-                        self.supabase_url, origin
-                    );
+    pub fn auth_url(origin: &str) -> String {
+        #[derive(serde::Serialize)]
+        struct AuthParams {
+            redirect_to: String,
+            provider: String,
+            scopes: String,
+        }
 
-                    let _ = window.location().set_href(&auth_url);
-                }
+        let query = serde_urlencoded::to_string(&AuthParams {
+            redirect_to: origin.to_string(),
+            provider: "github".to_string(),
+            scopes: "repo".to_string(),
+        }).unwrap_or_default();
+
+        format!(
+            "{}/auth/v1/authorize?{}",
+            Self::SUPABASE_URL,
+            query
+        )
+    }
+
+    async fn handle_callback_fragment(tx: AuthSender, data: AuthFragment) {
+        let username = GitHubAuth::fetch_user_info(&data.provider_token).await;
+
+        match username {
+            Ok(username) => {
+                tx.send(AuthEvent::LoginSuccessful(AuthState {
+                    logged_in: Some(LoggedInState {
+                        github_token: data.provider_token,
+                        supabase_token: data.access_token,
+                        expires_at: data.expires_at,
+                        username: username.login,
+                        user_image: Some(username.avatar_url.to_string()),
+                    }),
+                }))
+                .ok();
+            }
+            Err(err) => {
+                tx.send(AuthEvent::Error(format!(
+                    "Failed to fetch user info: {}",
+                    err
+                )))
+                .ok();
             }
         }
     }
 
-    pub fn check_for_auth_callback(&mut self) {
-        #[cfg(target_arch = "wasm32")]
-        {
-            // Check if we have auth tokens in the URL fragment
-            if let Some(window) = web_sys::window() {
-                if let Ok(hash) = window.location().hash() {
-                    if hash.contains("access_token") {
-                        // Parse tokens directly from URL fragment
-                        let tokens = self.parse_url_fragment(&hash);
+    async fn fetch_user_info(token: &str) -> anyhow::Result<Author> {
+        let client = GitHubAuth::make_client(Some(token));
+        let user = client.current().user().await?;
 
-                        if let (Some(access_token), Some(provider_token)) =
-                            (tokens.get("access_token"), tokens.get("provider_token"))
-                        {
-                            let sender = self.auth_sender.clone();
-                            let github_token = provider_token.clone();
-
-                            let access_token = access_token.clone();
-
-                            wasm_bindgen_futures::spawn_local(async move {
-                                match Self::fetch_user_info(&github_token).await {
-                                    Ok(username) => {
-                                        let expires_at = get_current_timestamp() + (24 * 60 * 60); // 24 hours
-
-                                        let logged_in_state = LoggedInState {
-                                            supabase_token: access_token.clone(),
-                                            github_token: github_token,
-                                            expires_at,
-                                            username,
-                                            user_image: None, // Could fetch user image if needed
-                                        };
-                                        let auth_state = AuthState {
-                                            logged_in: Some(logged_in_state),
-                                        };
-                                        let _ = sender.send(AuthEvent::LoginSuccessful(auth_state));
-
-                                        // Clear the URL hash
-                                        if let Some(window) = web_sys::window() {
-                                            if let Ok(history) = window.history() {
-                                                let _ = history.replace_state_with_url(
-                                                    &wasm_bindgen::JsValue::NULL,
-                                                    "",
-                                                    Some("./"),
-                                                );
-                                            }
-                                        }
-                                    }
-                                    Err(e) => {
-                                        let _ = sender.send(AuthEvent::Error(format!(
-                                            "Failed to fetch user info: {}",
-                                            e
-                                        )));
-                                    }
-                                }
-                            });
-                        } else {
-                            let _ = self.auth_sender.send(AuthEvent::Error(
-                                "Missing required tokens in OAuth callback".to_string(),
-                            ));
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    fn parse_url_fragment(&self, hash: &str) -> std::collections::HashMap<String, String> {
-        let mut params = std::collections::HashMap::new();
-
-        // Remove the leading # if present
-        let hash = hash.strip_prefix('#').unwrap_or(hash);
-
-        // Parse key=value pairs separated by &
-        for pair in hash.split('&') {
-            if let Some((key, value)) = pair.split_once('=') {
-                // URL decode the value
-                let decoded_value = js_sys::decode_uri_component(value)
-                    .unwrap_or_else(|_| value.into())
-                    .as_string()
-                    .unwrap_or_else(|| value.to_string());
-                params.insert(key.to_string(), decoded_value);
-            }
-        }
-
-        params
-    }
-
-    async fn fetch_user_info(token: &str) -> Result<String, AuthError> {
-        let mut request = ehttp::Request::get("https://api.github.com/user");
-        request
-            .headers
-            .insert("Authorization".to_owned(), format!("Bearer {token}"));
-        request
-            .headers
-            .insert("User-Agent".to_owned(), "kitdiff-app".to_owned());
-
-        let response = ehttp::fetch_async(request)
-            .await
-            .map_err(|e| AuthError::NetworkError(format!("Failed to fetch user info: {e}")))?;
-
-        if response.status == 200 {
-            let user_info: serde_json::Value = serde_json::from_slice(&response.bytes)
-                .map_err(|e| AuthError::ParseError(format!("Failed to parse user info: {e}")))?;
-
-            let username = user_info["login"]
-                .as_str()
-                .ok_or_else(|| AuthError::ParseError("Username not found in response".to_owned()))?
-                .to_owned();
-
-            Ok(username)
-        } else {
-            Err(AuthError::NetworkError(format!(
-                "GitHub API returned status: {}",
-                response.status
-            )))
-        }
+        Ok(user)
     }
 
     pub fn is_authenticated(&self) -> bool {
@@ -331,7 +239,6 @@ impl GitHubAuth {
 
     pub fn logout(&mut self) {
         self.state.logged_in = None;
-        let _ = self.auth_sender.send(AuthEvent::LogoutCompleted);
     }
 
     pub fn get_auth_state(&self) -> &AuthState {
@@ -339,19 +246,16 @@ impl GitHubAuth {
     }
 
     pub fn update(&mut self, _ctx: &egui::Context) {
-        // Check for auth callback in URL
-        self.check_for_auth_callback();
-
         // Check for messages from auth flow
-        while let Ok(event) = self.auth_receiver.try_recv() {
+        for event in self.inbox.read(_ctx) {
             match event {
                 AuthEvent::LoginSuccessful(state) => {
                     self.state = state;
+                    _ctx.send_viewport_cmd(ViewportCommand::Focus);
                 }
                 AuthEvent::Error(error) => {
                     eprintln!("Auth error: {error}");
                 }
-                _ => {}
             }
         }
     }

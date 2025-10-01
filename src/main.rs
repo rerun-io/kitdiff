@@ -62,7 +62,7 @@ fn parse_url_query_params() -> Option<DiffSource> {
                             || decoded_url.ends_with(".tar.gz")
                             || decoded_url.ends_with(".tgz")
                         {
-                            return Some(DiffSource::Archive(DataReference::Url(decoded_url)));
+                            return Some(DiffSource::Archive(kitdiff::DataReference::Url(decoded_url)));
                         }
                     }
                 }

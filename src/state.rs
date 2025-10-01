@@ -219,7 +219,7 @@ impl AppState {
                 });
             }
             SystemCommand::GithubAuth(auth) => {
-                self.github_auth.handle(auth);
+                self.github_auth.handle(ctx, auth);
             }
             SystemCommand::LoadPrDetails(url) => {
                 self.github_pr = Some(GithubPr::new(url, self.github_auth.client()));
