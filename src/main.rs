@@ -33,8 +33,6 @@ fn main() -> eframe::Result<()> {
 #[cfg(target_arch = "wasm32")]
 fn parse_url_query_params() -> Option<DiffSource> {
     use kitdiff::github::auth::parse_github_artifact_url;
-    use kitdiff::github::pr::parse_github_pr_url;
-    use octocrab::models::ArtifactId;
 
     if let Some(window) = web_sys::window() {
         if let Ok(search) = window.location().search() {

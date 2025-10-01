@@ -2,7 +2,6 @@ use crate::github::model::{GithubArtifactLink, GithubPrLink};
 pub use crate::loaders::{DataReference, SnapshotLoader};
 use crate::state::AppState;
 use eframe::egui::Context;
-use std::path::PathBuf;
 
 pub mod app;
 mod bar;
@@ -21,9 +20,9 @@ mod viewer;
 #[derive(Debug, Clone)]
 pub enum DiffSource {
     #[cfg(not(target_arch = "wasm32"))]
-    Files(PathBuf),
+    Files(std::path::PathBuf),
     #[cfg(not(target_arch = "wasm32"))]
-    Git(PathBuf),
+    Git(std::path::PathBuf),
     Pr(GithubPrLink),
     GHArtifact(GithubArtifactLink),
     Archive(DataReference),
