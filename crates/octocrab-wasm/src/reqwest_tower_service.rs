@@ -37,15 +37,12 @@ where
         Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>,
     >;
 
-    fn poll_ready(&mut self, cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&mut self, _cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, req: http::Request<Body>) -> Self::Future {
-        let Self {
-            base_url: base_url,
-            client: client,
-        } = self.clone();
+        let Self { base_url, client } = self.clone();
 
         Box::pin(async move {
             let (tx, rx) = futures::channel::oneshot::channel();
@@ -78,7 +75,7 @@ where
         .map_err(ReqwestTowerError::BodyError)?
         .to_bytes();
 
-    let mut uri = parts.uri;
+    let uri = parts.uri;
 
     let mut uri_parts = uri.into_parts();
     if uri_parts.authority.is_none() {

@@ -1,0 +1,26 @@
+<html lang="en">
+<head>
+    <title>Handling Login</title>
+    <script>
+        fetch("/api/auth", {
+            body: JSON.stringify({
+                fragment: window.location.hash.substring(1),
+            }),
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+        }).then((response) => {
+            if (response.ok) {
+                window.close();
+            } else {
+                document.body.innerText = "Login failed";
+            }
+        });
+
+    </script>
+</head>
+<body>
+Redirecting...
+</body>
+</html>

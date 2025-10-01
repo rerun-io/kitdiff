@@ -5,28 +5,34 @@ mod cli;
 use eframe::NativeOptions;
 use kitdiff::DiffSource;
 use kitdiff::app::App;
+use kitdiff::config::Config;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
-    use clap::Parser;
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("Failed to create Tokio runtime");
+    let _guard = rt.enter();
+
+    use clap::Parser as _;
     let mode = cli::Cli::parse();
 
     let source = mode
         .command
         .map(|c| c.to_source())
-        .unwrap_or(DiffSource::Files);
+        .unwrap_or(DiffSource::Files(".".into()));
 
     eframe::run_native(
         "kitdiff",
         NativeOptions::default(),
-        Box::new(move |cc| Ok(Box::new(App::new(cc, Some(source))))),
+        Box::new(move |cc| Ok(Box::new(App::new(cc, Some(source), Config::default())))),
     )
 }
 
 #[cfg(target_arch = "wasm32")]
 fn parse_url_query_params() -> Option<DiffSource> {
-    use kitdiff::github_auth::parse_github_artifact_url;
-    use kitdiff::github_pr::parse_github_pr_url;
+    use kitdiff::github::auth::parse_github_artifact_url;
 
     if let Some(window) = web_sys::window() {
         if let Ok(search) = window.location().search() {
@@ -40,32 +46,22 @@ fn parse_url_query_params() -> Option<DiffSource> {
                         let decoded_url = js_sys::decode_uri_component(value).ok()?.as_string()?;
 
                         // Try to parse as GitHub PR URL
-                        if let Ok((_user, _repo, _pr_number)) = parse_github_pr_url(&decoded_url) {
-                            return Some(DiffSource::Pr(decoded_url));
+                        if let Ok(link) = decoded_url.parse() {
+                            return Some(DiffSource::Pr(link));
                         }
 
                         // Try to parse as GitHub artifact URL
-                        if let Some((owner, repo, artifact_id)) =
-                            parse_github_artifact_url(&decoded_url)
-                        {
-                            return Some(DiffSource::GHArtifact {
-                                owner,
-                                repo,
-                                artifact_id,
-                            });
+                        if let Some(link) = parse_github_artifact_url(&decoded_url) {
+                            return Some(DiffSource::GHArtifact(link));
                         }
 
                         // Try to parse as direct zip/tar.gz URL
-                        if decoded_url.ends_with(".zip") {
-                            return Some(DiffSource::Zip(kitdiff::PathOrBlob::Url(
+                        if decoded_url.ends_with(".zip")
+                            || decoded_url.ends_with(".tar.gz")
+                            || decoded_url.ends_with(".tgz")
+                        {
+                            return Some(DiffSource::Archive(kitdiff::DataReference::Url(
                                 decoded_url,
-                                None,
-                            )));
-                        }
-                        if decoded_url.ends_with(".tar.gz") || decoded_url.ends_with(".tgz") {
-                            return Some(DiffSource::TarGz(kitdiff::PathOrBlob::Url(
-                                decoded_url,
-                                None,
                             )));
                         }
                     }
@@ -90,14 +86,15 @@ fn main() {
             .dyn_into::<HtmlCanvasElement>()
             .unwrap();
 
-        // Parse URL query parameters for DiffSource
+        // // Parse URL query parameters for DiffSource
+        // let diff_source = None;
         let diff_source = parse_url_query_params();
 
         let start_result = eframe::WebRunner::new()
             .start(
                 canvas,
                 web_options,
-                Box::new(move |cc| Ok(Box::new(App::new(cc, diff_source)))),
+                Box::new(move |cc| Ok(Box::new(App::new(cc, diff_source, Config::default())))),
             )
             .await;
 

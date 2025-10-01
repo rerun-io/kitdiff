@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use kitdiff::DiffSource;
-use kitdiff::github_auth::parse_github_artifact_url;
+use kitdiff::github::auth::parse_github_artifact_url;
 
 #[derive(Parser)]
 #[command(name = "kitdiff")]
@@ -13,13 +13,13 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// Compare snapshot test files (.png with .old/.new/.diff variants) (default)
-    Files,
+    Files { directory: Option<String> },
     /// Compare images between current branch and default branch
-    Git,
+    Git { repo_path: Option<String> },
     /// Compare images between PR branches from GitHub PR URL (needs to be run from within the repo)
     Pr { url: String },
     /// Load and compare snapshot files from a zip archive (URL or local file)
-    Zip { source: String },
+    Archive { source: String },
     /// Load and compare snapshot files from a GitHub artifact
     GhArtifact { url: String },
 }
@@ -27,60 +27,34 @@ pub enum Commands {
 impl Commands {
     pub fn to_source(&self) -> DiffSource {
         match self {
-            Commands::Files => DiffSource::Files,
-            Commands::Git => DiffSource::Git,
-            Commands::Pr { url } => {
+            Self::Files { directory } => {
+                DiffSource::Files(directory.clone().unwrap_or_else(|| ".".into()).into())
+            }
+            Self::Git { repo_path } => {
+                DiffSource::Git(repo_path.clone().unwrap_or_else(|| ".".into()).into())
+            }
+            Self::Pr { url } => {
                 // Check if the PR URL is actually a GitHub artifact URL
-                if let Some((owner, repo, artifact_id)) = parse_github_artifact_url(url) {
-                    DiffSource::GHArtifact {
-                        owner,
-                        repo,
-                        artifact_id,
-                    }
+                if let Some(link) = parse_github_artifact_url(url) {
+                    DiffSource::GHArtifact(link)
+                } else if let Ok(parsed_url) = url.parse() {
+                    DiffSource::Pr(parsed_url)
                 } else {
-                    DiffSource::Pr(url.clone())
+                    panic!("Invalid GitHub PR URL: {url}");
                 }
             }
-            Commands::Zip { source } => {
-                // Check if it's a GitHub artifact URL first
-                if let Some((owner, repo, artifact_id)) = parse_github_artifact_url(source) {
-                    DiffSource::GHArtifact {
-                        owner,
-                        repo,
-                        artifact_id,
-                    }
-                } else if source.starts_with("http://") || source.starts_with("https://") {
-                    #[cfg(target_arch = "wasm32")]
-                    {
-                        if source.ends_with(".tar.gz") || source.ends_with(".tgz") {
-                            DiffSource::TarGz(kitdiff::PathOrBlob::Url(source.clone(), None))
-                        } else {
-                            DiffSource::Zip(kitdiff::PathOrBlob::Url(source.clone(), None))
-                        }
-                    }
-                    #[cfg(not(target_arch = "wasm32"))]
-                    {
-                        panic!(
-                            "URL sources not supported on native platforms. Use 'gh-artifact' command for GitHub artifacts or download and provide a local file path."
-                        );
-                    }
+            Self::Archive { source } => {
+                if source.starts_with("http://") || source.starts_with("https://") {
+                    DiffSource::Archive(kitdiff::DataReference::Url(source.clone()))
                 } else {
-                    if source.ends_with(".tar.gz") || source.ends_with(".tgz") {
-                        DiffSource::TarGz(kitdiff::PathOrBlob::Path(source.clone().into()))
-                    } else {
-                        DiffSource::Zip(kitdiff::PathOrBlob::Path(source.clone().into()))
-                    }
+                    DiffSource::Archive(kitdiff::DataReference::Path(source.clone().into()))
                 }
             }
-            Commands::GhArtifact { url } => {
-                if let Some((owner, repo, artifact_id)) = parse_github_artifact_url(url) {
-                    DiffSource::GHArtifact {
-                        owner,
-                        repo,
-                        artifact_id,
-                    }
+            Self::GhArtifact { url } => {
+                if let Some(link) = parse_github_artifact_url(url) {
+                    DiffSource::GHArtifact(link)
                 } else {
-                    panic!("Invalid GitHub artifact URL: {}", url);
+                    panic!("Invalid GitHub artifact URL: {url}");
                 }
             }
         }

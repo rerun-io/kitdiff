@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Lucas Meurer <hi@lucasmerlin.me>"]
 edition = "2024"
 homepage = "https://github.com/rerun-io/kitdiff"
-rust-version = "1.85"
+rust-version = "1.88"
 categories = ["gui", "development-tools", "multimedia::images", "graphics"]
 description = "A visual diffing tool"
 include = ["LICENSE-APACHE", "LICENSE-MIT", "**/*.rs", "Cargo.toml"]
@@ -30,13 +30,24 @@ zip = { version = "5", default-features = false, features = ["deflate"] }
 flate2 = { version = "1.1" }
 tar = { version = "0.4" }
 chrono = { version = "0.4", features = ["serde"] }
-octocrab = { version = "0.45.0", default-features = false }
+octocrab = { version = "0.45.0", default-features = false, features = ["stream"] }
 octocrab-wasm = { path = "crates/octocrab-wasm" }
 egui_inbox = { version = "0.9.0", features = ["async", "tokio"] }
 futures = "0.3"
+re_ui = "0.26.0-alpha.1+dev"
+getrandom = { version = "0.3", features = ["wasm_js"] }
+anyhow = "1.0.99"
+graphql_client = "0.14.0"
+thiserror = "1.0.69"
+bytes = "1.10.1"
+reqwest = "0.12.23"
+hello_egui_utils = "0.9.0"
+serde_urlencoded = "0.7"
+web-time = "1"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+axum = "0.8.6"
 env_logger = "0.11.8"
 ignore = { version = "0.4" }
 clap = { version = "4.0", features = ["derive"] }
@@ -64,6 +75,9 @@ opt-level = 2
 egui = { git = "https://github.com/emilk/egui", branch = "lucas/experiments/kitdiff" }
 eframe = { git = "https://github.com/emilk/egui", branch = "lucas/experiments/kitdiff" }
 egui_extras = { git = "https://github.com/emilk/egui", branch = "lucas/experiments/kitdiff" }
+
+re_ui = { git = "https://github.com/rerun-io/rerun", branch = "main" }
+egui_commonmark = { git = "https://github.com/rerun-io/egui_commonmark.git", branch = "lucas/update-egui-main" }
 
 # If you fork https://github.com/emilk/egui you can test with:
 # egui = { path = "../egui/crates/egui" }
@@ -178,7 +192,6 @@ manual_string_new = "warn"
 map_err_ignore = "warn"
 map_flatten = "warn"
 match_bool = "warn"
-match_on_vec_items = "warn"
 match_same_arms = "warn"
 match_wild_err_arm = "warn"
 match_wildcard_for_single_variants = "warn"
