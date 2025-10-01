@@ -125,6 +125,10 @@ impl LoadSnapshots for PrLoader {
         self.pr_info.update(ctx);
     }
 
+    fn refresh(&mut self, client: Octocrab) {
+        *self = Self::new(self.link.clone(), client);
+    }
+
     fn snapshots(&self) -> &[Snapshot] {
         &self.snapshots
     }

@@ -28,13 +28,13 @@ impl App {
             .and_then(|s| eframe::get_value(s, eframe::APP_KEY))
             .unwrap_or_default();
 
-        let state = AppState::new(settings, config);
+        let inbox = UiInbox::new();
+        let state = AppState::new(settings, config, inbox.sender());
 
         install_image_loaders(&cc.egui_ctx);
         let diff_loader = Arc::new(DiffImageLoader::default());
         cc.egui_ctx.add_image_loader(diff_loader.clone());
 
-        let inbox = UiInbox::new();
 
         if let Some(source) = source {
             inbox.sender().send(SystemCommand::Open(source)).ok();

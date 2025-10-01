@@ -45,6 +45,7 @@ pub struct LoggedInState {
 pub struct GitHubAuth {
     state: AuthState,
     inbox: UiInbox<AuthEvent>,
+    sender: UiInboxSender<SystemCommand>,
 }
 
 impl GitHubAuth {
@@ -140,10 +141,11 @@ impl GitHubAuth {
     pub const SUPABASE_URL: &'static str = "https://fqhsaeyjqrjmlkqflvho.supabase.co";
     pub const SUPABASE_ANON_KEY: &'static str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxaHNhZXlqcXJqbWxrcWZsdmhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgyMTk4MzIsImV4cCI6MjA3Mzc5NTgzMn0.TuhMjHhBCNyKquyVWq3djOfpBVDhcpSmNRWSErpseuw";
 
-    pub fn new(state: AuthState) -> Self {
-        let mut this = Self {
+    pub fn new(state: AuthState, sender: UiInboxSender<SystemCommand>) -> Self {
+        let this = Self {
             state,
             inbox: UiInbox::new(),
+            sender,
         };
 
         auth_impl::check_for_auth_callback(this.inbox.sender());
@@ -252,6 +254,7 @@ impl GitHubAuth {
                 AuthEvent::LoginSuccessful(state) => {
                     self.state = state;
                     _ctx.send_viewport_cmd(ViewportCommand::Focus);
+                    self.sender.send(SystemCommand::Refresh).ok();
                 }
                 AuthEvent::Error(error) => {
                     eprintln!("Auth error: {error}");

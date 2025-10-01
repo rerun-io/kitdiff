@@ -140,4 +140,8 @@ impl LoadSnapshots for GHArtifactLoader {
             }
         }
     }
+
+    fn refresh(&mut self, client: Octocrab) {
+        *self = Self::new(client, self.artifact.clone());
+    }
 }

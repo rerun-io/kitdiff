@@ -3,6 +3,7 @@ use crate::state::AppStateRef;
 use eframe::egui;
 use std::path::PathBuf;
 use std::task::Poll;
+use octocrab::Octocrab;
 
 pub mod archive_loader;
 pub mod gh_archive_loader;
@@ -10,6 +11,8 @@ pub mod pr_loader;
 
 pub trait LoadSnapshots {
     fn update(&mut self, ctx: &egui::Context);
+    
+    fn refresh(&mut self, client: Octocrab);
 
     fn snapshots(&self) -> &[Snapshot];
 
@@ -20,6 +23,7 @@ pub trait LoadSnapshots {
     fn extra_ui(&self, ui: &mut egui::Ui, state: &AppStateRef<'_>) {}
 
     fn files_header(&self) -> String;
+
 }
 
 pub type SnapshotLoader = Box<dyn LoadSnapshots + Send + Sync>;

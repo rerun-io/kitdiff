@@ -9,6 +9,7 @@ use std::fmt::Display;
 use std::path::{Path, PathBuf};
 use std::str;
 use std::task::Poll;
+use octocrab::Octocrab;
 
 enum Command {
     Snapshot(Snapshot),
@@ -83,6 +84,10 @@ impl LoadSnapshots for GitLoader {
                 }
             }
         }
+    }
+
+    fn refresh(&mut self, _client: Octocrab) {
+        *self = Self::new(self.base_path.clone());
     }
 
     fn snapshots(&self) -> &[Snapshot] {

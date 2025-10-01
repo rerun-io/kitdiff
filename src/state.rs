@@ -8,6 +8,7 @@ use crate::settings::Settings;
 use crate::snapshot::Snapshot;
 use eframe::egui::Context;
 use egui_inbox::UiInboxSender;
+use octocrab::Octocrab;
 use std::ops::Deref;
 
 pub struct AppState {
@@ -68,9 +69,9 @@ impl ViewFilter {
 }
 
 impl AppState {
-    pub fn new(settings: Settings, config: Config) -> Self {
+    pub fn new(settings: Settings, config: Config, sender: UiInboxSender<SystemCommand>) -> Self {
         Self {
-            github_auth: GitHubAuth::new(settings.auth.clone()),
+            github_auth: GitHubAuth::new(settings.auth.clone(), sender),
             github_pr: None,
             settings,
             config,
@@ -191,6 +192,7 @@ pub enum SystemCommand {
     LoadPrDetails(GithubPrLink),
     UpdateSettings(Settings),
     ViewerCommand(ViewerSystemCommand),
+    Refresh,
 }
 
 pub enum ViewerSystemCommand {
@@ -235,6 +237,13 @@ impl AppState {
                     eprintln!("Received ViewerCommand but not in DiffViewer page"); // TODO: Better logging
                 }
             }
+            SystemCommand::Refresh => match &mut self.page {
+                Page::Home => {}
+                Page::DiffViewer(viewer) => {
+                    let client = self.github_auth.client();
+                    viewer.refresh(client);
+                }
+            },
         }
     }
 
@@ -265,5 +274,10 @@ impl ViewerState {
                 self.view_filter = view_filter;
             }
         }
+    }
+
+    pub fn refresh(&mut self, client: Octocrab) {
+        self.loader.refresh(client);
+        self.index = 0;
     }
 }

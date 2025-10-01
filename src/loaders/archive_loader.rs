@@ -18,6 +18,7 @@ pub struct ArchiveLoader {
     data: Poll<anyhow::Result<Vec<Snapshot>>>,
     inbox: UiInbox<Result<Vec<Snapshot>>>,
     name: String,
+    pub reference: DataReference,
 }
 
 fn is_zip(data: &[u8]) -> bool {
@@ -30,15 +31,19 @@ fn is_tar_gz(data: &[u8]) -> bool {
 
 impl ArchiveLoader {
     pub fn new(data: DataReference) -> Self {
-        let name = data.file_name().to_owned();
         let mut inbox = UiInbox::new();
+        {
+            let data = data.clone();
 
-        inbox.spawn(|tx| async move {
-            let result = run_discovery(data).await;
-            tx.send(result).ok();
-        });
+            inbox.spawn(|tx| async move {
+                let result = run_discovery(data).await;
+                tx.send(result).ok();
+            });
+        }
 
+        let name = data.file_name().to_owned();
         Self {
+            reference: data,
             name,
             data: Poll::Pending,
             inbox,
@@ -77,6 +82,10 @@ impl LoadSnapshots for ArchiveLoader {
             Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
             Poll::Pending => Poll::Pending,
         }
+    }
+
+    fn refresh(&mut self, _client: octocrab::Octocrab) {
+        *self = ArchiveLoader::new(self.reference.clone());
     }
 }
 

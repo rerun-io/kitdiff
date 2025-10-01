@@ -7,6 +7,7 @@ use ignore::WalkBuilder;
 use ignore::types::TypesBuilder;
 use std::path::{Path, PathBuf};
 use std::task::Poll;
+use octocrab::Octocrab;
 
 pub struct FileLoader {
     base_path: PathBuf,
@@ -65,6 +66,10 @@ impl LoadSnapshots for FileLoader {
                 self.loading = false;
             }
         }
+    }
+
+    fn refresh(&mut self, client: Octocrab) {
+        *self = Self::new(self.base_path.clone());
     }
 
     fn snapshots(&self) -> &[Snapshot] {
