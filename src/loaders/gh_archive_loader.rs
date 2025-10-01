@@ -12,9 +12,21 @@ use octocrab::params::actions::ArchiveFormat;
 use serde_json::json;
 use std::task::Poll;
 
+enum PipelineState {
+    Loading,
+    Triggered,
+    Error(anyhow::Error),
+}
+
+enum Event {
+    PipelineState(PipelineState),
+}
+
 pub struct GHArtifactLoader {
     state: LoaderState,
     artifact: GithubArtifactLink,
+    pipeline_state: Option<PipelineState>,
+    inbox: UiInbox<Event>,
 }
 
 #[derive(Debug)]
@@ -26,18 +38,22 @@ pub enum LoaderState {
 
 impl GHArtifactLoader {
     pub fn new(client: Octocrab, artifact: GithubArtifactLink) -> Self {
-        let mut inbox = UiInbox::new();
+        let mut data_inbox = UiInbox::new();
 
         {
             let artifact = artifact.clone();
-            inbox.spawn(move |tx| async move {
+            data_inbox.spawn(move |tx| async move {
                 tx.send(download_artifact(&client, &artifact).await).ok();
             });
         }
 
+        let inbox = UiInbox::new();
+
         Self {
-            state: LoaderState::LoadingData(inbox),
+            state: LoaderState::LoadingData(data_inbox),
             artifact,
+            pipeline_state: None,
+            inbox,
         }
     }
 }
@@ -61,18 +77,26 @@ pub async fn download_artifact(
 
 impl LoadSnapshots for GHArtifactLoader {
     fn update(&mut self, ctx: &Context) {
-        let mut new_self = None;
+        for event in self.inbox.read(ctx) {
+            match event {
+                Event::PipelineState(state) => {
+                    self.pipeline_state = Some(state);
+                }
+            }
+        }
+
+        let mut new_state = None;
         match &mut self.state {
             LoaderState::LoadingData(inbox) => {
                 if let Some(result) = inbox.read(ctx).last() {
                     match result {
                         Ok((data, name)) => {
-                            new_self = Some(LoaderState::LoadingArchive(ArchiveLoader::new(
+                            new_state = Some(LoaderState::LoadingArchive(ArchiveLoader::new(
                                 crate::loaders::DataReference::Data(data.clone(), name),
                             )));
                         }
                         Err(e) => {
-                            new_self = Some(LoaderState::Error(e));
+                            new_state = Some(LoaderState::Error(e));
                         }
                     }
                 }
@@ -82,7 +106,7 @@ impl LoadSnapshots for GHArtifactLoader {
             }
             LoaderState::Error(_) => {}
         }
-        if let Some(new_self) = new_self {
+        if let Some(new_self) = new_state {
             self.state = new_self;
         }
     }
@@ -113,16 +137,18 @@ impl LoadSnapshots for GHArtifactLoader {
     fn extra_ui(&self, ui: &mut Ui, state: &AppStateRef<'_>) {
         if let Some((git_ref, run_id)) = self.artifact.branch_name.clone().zip(self.artifact.run_id)
         {
-            let response = ui
-                .button("Update snapshots from this archive")
-                .on_hover_text(
-                    "This will create a commit on the PR branch with the updated snapshots.",
-                );
+            let response = ui.button("Commit the updated snapshots").on_hover_text(
+                "This will create a commit on the PR branch with the updated snapshots.",
+            );
             if response.clicked() {
                 let client = state.github_auth.client();
                 let artifact = self.artifact.clone();
+                let sender = self.inbox.sender();
+                sender
+                    .send(Event::PipelineState(PipelineState::Loading))
+                    .ok();
                 hello_egui_utils::spawn(async move {
-                    let _ = client
+                    let result = client
                         .actions()
                         .create_workflow_dispatch(
                             artifact.repo.owner,
@@ -136,7 +162,33 @@ impl LoadSnapshots for GHArtifactLoader {
                         }))
                         .send()
                         .await;
+
+                    match result {
+                        Ok(()) => {
+                            sender
+                                .send(Event::PipelineState(PipelineState::Triggered))
+                                .ok();
+                        }
+                        Err(err) => {
+                            sender
+                                .send(Event::PipelineState(PipelineState::Error(err.into())))
+                                .ok();
+                        }
+                    }
                 });
+            }
+
+            match &self.pipeline_state {
+                Some(PipelineState::Loading) => {
+                    ui.label("Triggering pipeline...");
+                }
+                Some(PipelineState::Triggered) => {
+                    ui.label("Pipeline triggered! Check the PR workflows for progress.");
+                }
+                Some(PipelineState::Error(err)) => {
+                    ui.colored_label(ui.visuals().error_fg_color, format!("Error: {err}"));
+                }
+                None => {}
             }
         }
     }

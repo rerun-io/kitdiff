@@ -2,7 +2,7 @@ use crate::github::auth::{AuthSender, GitHubAuth, parse_supabase_fragment};
 use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::response::Html;
+use axum::response::{Html, Response};
 use eframe::egui::{Context, OpenUrl};
 use std::net::{Ipv4Addr, SocketAddrV4};
 use tokio::spawn;
@@ -16,7 +16,8 @@ pub fn login_github(ctx: &Context, tx: AuthSender) {
     });
 }
 
-pub fn check_for_auth_callback(sender: AuthSender) {
+#[expect(clippy::needless_pass_by_value)]
+pub fn check_for_auth_callback(_sender: AuthSender) {
     // Not implemented for native
 }
 
@@ -51,10 +52,15 @@ struct AuthBody {
 async fn auth_route(
     State(tx): State<AuthSender>,
     Json(body): Json<AuthBody>,
-) -> Result<String, StatusCode> {
+) -> Result<String, Response<String>> {
     let fragment = body.fragment;
 
-    let data = parse_supabase_fragment(&fragment).map_err(|_| StatusCode::BAD_REQUEST)?;
+    let data = parse_supabase_fragment(&fragment).map_err(|e| {
+        Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body(e.to_string())
+            .expect("Failed to build error response")
+    })?;
 
     GitHubAuth::handle_callback_fragment(tx, data).await;
 

@@ -19,6 +19,7 @@ use re_ui::{OnResponseExt as _, SectionCollapsingHeader, UiExt as _, icons};
 // use chrono::DateTime;
 pub type GitObjectID = String;
 pub type DateTime = String;
+#[allow(clippy::upper_case_acronyms)]
 pub type URI = String;
 
 // The paths are relative to the directory where your `Cargo.toml` is located.
@@ -132,7 +133,7 @@ impl GithubPr {
             let client = RepoClient::new(client.clone(), link.repo.clone());
             inbox.spawn(|tx| async move {
                 let details = get_pr_commits(&client, link.pr_number).await;
-                let _ = tx.send(GithubPrCommand::FetchedData(details));
+                tx.send(GithubPrCommand::FetchedData(details)).ok();
             });
         }
 
@@ -174,10 +175,11 @@ impl GithubPr {
                                 self.inbox.spawn(move |tx| async move {
                                     let artifacts =
                                         fetch_commit_artifacts(&client, workflow_run_ids).await;
-                                    let _ = tx.send(GithubPrCommand::FetchedCommitArtifacts {
+                                    tx.send(GithubPrCommand::FetchedCommitArtifacts {
                                         sha,
                                         artifacts,
-                                    });
+                                    })
+                                    .ok();
                                 });
                             }
                         }
@@ -217,104 +219,106 @@ async fn get_pr_commits(repo: &RepoClient, pr: PrNumber) -> Result<PrWithCommits
         .commits
         .nodes
         .ok_or_else(|| anyhow!("No commits found"))?
+        .into_iter()
+        .flatten()
     {
-        if let Some(commit) = commit {
-            let commit = commit.commit;
-            let sha = commit.oid;
-            let message = commit.message_headline;
+        let commit = commit.commit;
+        let sha = commit.oid;
+        let message = commit.message_headline;
 
-            let mut status = CommitState::Success;
-            let mut workflow_run_ids = HashSet::new();
+        let mut status = CommitState::Success;
+        let mut workflow_run_ids = HashSet::new();
 
-            // Unfortunately github has no easy way to get the status for a commit, best thing seems to be
-            // to query all check suites and group them by workflow.
-            let mut last_suite_per_workflow = HashMap::new();
+        // Unfortunately github has no easy way to get the status for a commit, best thing seems to be
+        // to query all check suites and group them by workflow.
+        let mut last_suite_per_workflow = HashMap::new();
 
-            if let Some(suites) = commit.check_suites {
-                if let Some(nodes) = suites.nodes {
-                    for node in nodes {
-                        if let Some(node) = node {
-                            if let Some(workflow_run) = node.workflow_run.clone() {
-                                last_suite_per_workflow.insert(workflow_run.workflow.id, node);
-                            }
-                        }
+        if let Some(suites) = commit.check_suites {
+            if let Some(nodes) = suites.nodes {
+                for node in nodes.into_iter().flatten() {
+                    if let Some(workflow_run) = node.workflow_run.clone() {
+                        last_suite_per_workflow.insert(workflow_run.workflow.id, node);
                     }
                 }
             }
-
-            for (_workflow_id, suite) in last_suite_per_workflow {
-                let pending = match suite.status {
-                    pr_details_query::CheckStatusState::COMPLETED => false,
-                    pr_details_query::CheckStatusState::IN_PROGRESS => true,
-                    pr_details_query::CheckStatusState::PENDING => true,
-                    pr_details_query::CheckStatusState::QUEUED => true,
-                    pr_details_query::CheckStatusState::REQUESTED => true,
-                    pr_details_query::CheckStatusState::WAITING => true,
-                    pr_details_query::CheckStatusState::Other(_) => false,
-                };
-                let error = if let Some(conclusion) = suite.conclusion {
-                    match conclusion {
-                        pr_details_query::CheckConclusionState::ACTION_REQUIRED => true,
-                        pr_details_query::CheckConclusionState::CANCELLED => true,
-                        pr_details_query::CheckConclusionState::FAILURE => true,
-                        pr_details_query::CheckConclusionState::NEUTRAL => false,
-                        pr_details_query::CheckConclusionState::SKIPPED => false,
-                        pr_details_query::CheckConclusionState::STALE => false,
-                        pr_details_query::CheckConclusionState::STARTUP_FAILURE => true,
-                        pr_details_query::CheckConclusionState::SUCCESS => false,
-                        pr_details_query::CheckConclusionState::TIMED_OUT => true,
-                        pr_details_query::CheckConclusionState::Other(_) => true,
-                    }
-                } else {
-                    false
-                };
-                if error {
-                    status = CommitState::Failure;
-                } else if pending && status != CommitState::Failure {
-                    status = CommitState::Pending;
-                }
-
-                if let Some(run) = suite.workflow_run {
-                    if let Some(db_id) = run.database_id {
-                        workflow_run_ids.insert(db_id as u64);
-                    }
-                }
-            }
-
-            data.commits.push(CommitData {
-                message,
-                sha,
-                status,
-                workflow_run_ids: workflow_run_ids.into_iter().collect(),
-            });
         }
+
+        #[expect(clippy::iter_over_hash_type)]
+        for suite in last_suite_per_workflow.values() {
+            let pending = match suite.status {
+                pr_details_query::CheckStatusState::COMPLETED => false,
+                pr_details_query::CheckStatusState::IN_PROGRESS => true,
+                pr_details_query::CheckStatusState::PENDING => true,
+                pr_details_query::CheckStatusState::QUEUED => true,
+                pr_details_query::CheckStatusState::REQUESTED => true,
+                pr_details_query::CheckStatusState::WAITING => true,
+                pr_details_query::CheckStatusState::Other(_) => false,
+            };
+            let error = if let Some(conclusion) = &suite.conclusion {
+                match conclusion {
+                    pr_details_query::CheckConclusionState::ACTION_REQUIRED => true,
+                    pr_details_query::CheckConclusionState::CANCELLED => true,
+                    pr_details_query::CheckConclusionState::FAILURE => true,
+                    pr_details_query::CheckConclusionState::NEUTRAL => false,
+                    pr_details_query::CheckConclusionState::SKIPPED => false,
+                    pr_details_query::CheckConclusionState::STALE => false,
+                    pr_details_query::CheckConclusionState::STARTUP_FAILURE => true,
+                    pr_details_query::CheckConclusionState::SUCCESS => false,
+                    pr_details_query::CheckConclusionState::TIMED_OUT => true,
+                    pr_details_query::CheckConclusionState::Other(_) => true,
+                }
+            } else {
+                false
+            };
+            if error {
+                status = CommitState::Failure;
+            } else if pending && status != CommitState::Failure {
+                status = CommitState::Pending;
+            }
+
+            if let Some(run) = &suite.workflow_run {
+                if let Some(db_id) = run.database_id {
+                    workflow_run_ids.insert(db_id as u64);
+                }
+            }
+        }
+
+        data.commits.push(CommitData {
+            message,
+            sha,
+            status,
+            workflow_run_ids: workflow_run_ids.into_iter().collect(),
+        });
     }
 
     Ok(data)
 }
 
 async fn fetch_commit_artifacts(repo: &RepoClient, run_ids: Vec<u64>) -> Result<Vec<ArtifactData>> {
-    let artifacts = FuturesUnordered::from_iter(run_ids.into_iter().map(|run| async move {
-        let artifacts_page = repo
-            .actions()
-            .list_workflow_run_artifacts(&repo.repo().owner, &repo.repo().repo, RunId(run))
-            .send()
-            .await?
-            .value
-            .expect("No etag was provided, so we should have a value");
+    let artifacts = run_ids
+        .into_iter()
+        .map(|run| async move {
+            let artifacts_page = repo
+                .actions()
+                .list_workflow_run_artifacts(&repo.repo().owner, &repo.repo().repo, RunId(run))
+                .send()
+                .await?
+                .value
+                .expect("No etag was provided, so we should have a value");
 
-        let stream = artifacts_page
-            .into_stream(repo)
-            .map_ok(move |artifact| ArtifactData {
-                data: artifact,
-                run_id: RunId(run),
-            });
+            let stream = artifacts_page
+                .into_stream(repo)
+                .map_ok(move |artifact| ArtifactData {
+                    data: artifact,
+                    run_id: RunId(run),
+                });
 
-        Ok(stream)
-    }))
-    .try_flatten()
-    .try_collect::<Vec<ArtifactData>>()
-    .await?;
+            Ok(stream)
+        })
+        .collect::<FuturesUnordered<_>>()
+        .try_flatten()
+        .try_collect::<Vec<ArtifactData>>()
+        .await?;
 
     Ok(artifacts)
 }

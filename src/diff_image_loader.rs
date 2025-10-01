@@ -6,10 +6,12 @@ use egui_extras::loaders::image_loader::ImageCrateLoader;
 use std::sync::Arc;
 use std::task::Poll;
 
+type DiffMap = HashMap<String, Result<Poll<DiffInfo>, LoadError>>;
+
 #[derive(Default)]
 pub struct DiffImageLoader {
     image_loader: Arc<ImageCrateLoader>,
-    diffs: Arc<Mutex<HashMap<String, Result<Poll<DiffInfo>, LoadError>>>>,
+    diffs: Arc<Mutex<DiffMap>>,
 }
 
 #[derive(Debug, Clone)]
@@ -47,7 +49,7 @@ impl DiffUri {
     }
 
     pub fn to_uri(&self) -> String {
-        format!("diff://{}", serde_json::to_string(self).unwrap())
+        format!("diff://{}", serde_json::to_string(self).expect("Failed to serialize DiffUri"))
     }
 }
 
@@ -114,11 +116,11 @@ impl ImageLoader for DiffImageLoader {
 
                 let uri = uri.to_owned();
                 #[cfg(not(target_arch = "wasm32"))]
-                std::thread::spawn(move || {
+                std::thread::Builder::new().name(format!("diff for {uri}")).spawn(move || {
                     ctx.request_repaint();
                     let result = load_diffs(&ctx, &old_image, &new_image, size_hint, &diff_uri);
                     cache.lock().insert(uri, result.map(Poll::Ready));
-                });
+                }).expect("Failed to spawn diff thread");
                 #[cfg(target_arch = "wasm32")]
                 {
                     wasm_bindgen_futures::spawn_local(async move {

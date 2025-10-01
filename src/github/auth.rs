@@ -72,23 +72,6 @@ pub enum AuthEvent {
 
 pub type AuthSender = UiInboxSender<AuthEvent>;
 
-// Helper function to get current timestamp in seconds
-fn get_current_timestamp() -> u64 {
-    #[cfg(target_arch = "wasm32")]
-    {
-        // Use JavaScript Date.now() for WASM
-        (js_sys::Date::now() / 1000.0) as u64
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-    }
-}
-
 // URL parsing utilities
 pub fn parse_github_artifact_url(url: &str) -> Option<GithubArtifactLink> {
     // Expected format: github.com/owner/repo/actions/runs/12345/artifacts/67890
@@ -138,16 +121,34 @@ impl GitHubAuth {
     pub const SUPABASE_ANON_KEY: &'static str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxaHNhZXlqcXJqbWxrcWZsdmhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgyMTk4MzIsImV4cCI6MjA3Mzc5NTgzMn0.TuhMjHhBCNyKquyVWq3djOfpBVDhcpSmNRWSErpseuw";
 
     pub fn new(state: AuthState, sender: UiInboxSender<SystemCommand>) -> Self {
-        let this = Self {
+        let mut this = Self {
             state,
             inbox: UiInbox::new(),
             sender,
         };
 
+        // if this.check_expired() {
+        //     this.sender
+        //         .send(SystemCommand::GithubAuth(GithubAuthCommand::Login))
+        //         .ok();
+        // }
         auth_impl::check_for_auth_callback(this.inbox.sender());
 
         this
     }
+    // Apparently the github token is valid indefinitely?
+    // fn check_expired(&mut self) -> bool {
+    //     if let Some(logged_in) = &self.state.logged_in {
+    //         let now = web_time::SystemTime::now()
+    //             .duration_since(web_time::UNIX_EPOCH)
+    //             .expect("Time went backwards")
+    //             .as_secs();
+    //         dbg!(now, logged_in.expires_at);
+    //         now >= logged_in.expires_at - 60 * 60 // When opening the app the token is valid for at least 1 hour
+    //     } else {
+    //         false
+    //     }
+    // }
 
     pub fn handle(&mut self, ctx: &Context, cmd: GithubAuthCommand) {
         match cmd {
@@ -208,27 +209,15 @@ impl GitHubAuth {
         Ok(user)
     }
 
-    pub fn is_authenticated(&self) -> bool {
-        if let Some(state) = &self.state.logged_in {
-            let now = get_current_timestamp();
-            return now < state.expires_at;
-        }
-        false
-    }
-
     pub fn get_username(&self) -> Option<&str> {
         self.state.logged_in.as_ref().map(|s| s.username.as_str())
     }
 
     pub fn get_token(&self) -> Option<&str> {
-        if self.is_authenticated() {
-            self.state
-                .logged_in
-                .as_ref()
-                .map(|s| s.github_token.as_str())
-        } else {
-            None
-        }
+        self.state
+            .logged_in
+            .as_ref()
+            .map(|s| s.github_token.as_str())
     }
 
     pub fn logout(&mut self) {

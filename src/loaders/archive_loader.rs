@@ -111,7 +111,7 @@ fn sync_discovery(data: Bytes) -> anyhow::Result<Vec<Snapshot>> {
         anyhow::bail!("Unsupported archive format");
     };
 
-    Ok(get_snapshots(files))
+    Ok(get_snapshots(&files))
 }
 
 fn run_zip_discovery(zip_data: Bytes) -> Result<HashMap<PathBuf, Vec<u8>>> {
@@ -162,10 +162,11 @@ fn run_tar_discovery(tar_data: Bytes) -> Result<HashMap<PathBuf, Vec<u8>>> {
     Ok(files)
 }
 
-fn get_snapshots(files: HashMap<PathBuf, Vec<u8>>) -> Vec<Snapshot> {
+fn get_snapshots(files: &HashMap<PathBuf, Vec<u8>>) -> Vec<Snapshot> {
     let mut snapshots = Vec::new();
     let mut processed_files = std::collections::HashSet::new();
 
+    #[expect(clippy::iter_over_hash_type)]
     for png_path in files.keys() {
         if processed_files.contains(png_path) {
             continue;
