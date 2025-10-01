@@ -42,10 +42,7 @@ where
     }
 
     fn call(&mut self, req: http::Request<Body>) -> Self::Future {
-        let Self {
-            base_url,
-            client,
-        } = self.clone();
+        let Self { base_url, client } = self.clone();
 
         Box::pin(async move {
             let (tx, rx) = futures::channel::oneshot::channel();
