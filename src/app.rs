@@ -35,7 +35,6 @@ impl App {
         let diff_loader = Arc::new(DiffImageLoader::default());
         cc.egui_ctx.add_image_loader(diff_loader.clone());
 
-
         if let Some(source) = source {
             inbox.sender().send(SystemCommand::Open(source)).ok();
         }

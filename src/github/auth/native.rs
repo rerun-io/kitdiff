@@ -1,20 +1,17 @@
-use crate::github::auth::{
-    AuthEvent, AuthSender, AuthState, GitHubAuth, LoggedInState, parse_supabase_fragment,
-};
+use crate::github::auth::{AuthSender, GitHubAuth, parse_supabase_fragment};
 use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::response::{Html, Response};
-use eframe::egui;
+use axum::response::Html;
 use eframe::egui::{Context, OpenUrl};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::net::{Ipv4Addr, SocketAddrV4};
 use tokio::spawn;
 
 pub fn login_github(ctx: &Context, tx: AuthSender) {
     let ctx = ctx.clone();
     spawn(async move {
         if let Err(err) = login(ctx, tx).await {
-            eprintln!("Error during GitHub login: {:?}", err);
+            eprintln!("Error during GitHub login: {err:?}");
         }
     });
 }
@@ -22,7 +19,6 @@ pub fn login_github(ctx: &Context, tx: AuthSender) {
 pub fn check_for_auth_callback(sender: AuthSender) {
     // Not implemented for native
 }
-
 
 pub async fn login(ctx: Context, tx: AuthSender) -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0)).await?;
@@ -59,8 +55,8 @@ async fn auth_route(
     let fragment = body.fragment;
 
     let data = parse_supabase_fragment(&fragment).map_err(|_| StatusCode::BAD_REQUEST)?;
-    
+
     GitHubAuth::handle_callback_fragment(tx, data).await;
-    
-    Ok("Success".to_string())
+
+    Ok("Success".to_owned())
 }

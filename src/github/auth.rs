@@ -3,11 +3,7 @@ use crate::state::SystemCommand;
 use eframe::egui;
 use eframe::egui::{Context, ViewportCommand};
 use egui_inbox::{UiInbox, UiInboxSender};
-use ehttp;
 use octocrab::models::{ArtifactId, Author};
-use serde_json;
-use std::fmt;
-use std::sync::mpsc;
 
 #[cfg(target_arch = "wasm32")]
 #[path = "auth/wasm.rs"]
@@ -155,7 +151,7 @@ impl GitHubAuth {
 
     pub fn handle(&mut self, ctx: &Context, cmd: GithubAuthCommand) {
         match cmd {
-            GithubAuthCommand::Login => auth_impl::login_github(&ctx, self.inbox.sender()),
+            GithubAuthCommand::Login => auth_impl::login_github(ctx, self.inbox.sender()),
             GithubAuthCommand::Logout => {
                 self.logout();
             }
@@ -171,20 +167,17 @@ impl GitHubAuth {
         }
 
         let query = serde_urlencoded::to_string(&AuthParams {
-            redirect_to: origin.to_string(),
-            provider: "github".to_string(),
-            scopes: "repo".to_string(),
-        }).unwrap_or_default();
+            redirect_to: origin.to_owned(),
+            provider: "github".to_owned(),
+            scopes: "repo".to_owned(),
+        })
+        .unwrap_or_default();
 
-        format!(
-            "{}/auth/v1/authorize?{}",
-            Self::SUPABASE_URL,
-            query
-        )
+        format!("{}/auth/v1/authorize?{}", Self::SUPABASE_URL, query)
     }
 
     async fn handle_callback_fragment(tx: AuthSender, data: AuthFragment) {
-        let username = GitHubAuth::fetch_user_info(&data.provider_token).await;
+        let username = Self::fetch_user_info(&data.provider_token).await;
 
         match username {
             Ok(username) => {
@@ -201,8 +194,7 @@ impl GitHubAuth {
             }
             Err(err) => {
                 tx.send(AuthEvent::Error(format!(
-                    "Failed to fetch user info: {}",
-                    err
+                    "Failed to fetch user info: {err}"
                 )))
                 .ok();
             }
@@ -210,7 +202,7 @@ impl GitHubAuth {
     }
 
     async fn fetch_user_info(token: &str) -> anyhow::Result<Author> {
-        let client = GitHubAuth::make_client(Some(token));
+        let client = Self::make_client(Some(token));
         let user = client.current().user().await?;
 
         Ok(user)

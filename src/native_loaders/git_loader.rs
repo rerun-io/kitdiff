@@ -4,12 +4,12 @@ use eframe::egui::load::Bytes;
 use eframe::egui::{Context, ImageSource};
 use egui_inbox::{UiInbox, UiInboxSender};
 use git2::{ObjectType, Repository};
+use octocrab::Octocrab;
 use std::borrow::Cow;
 use std::fmt::Display;
 use std::path::{Path, PathBuf};
 use std::str;
 use std::task::Poll;
-use octocrab::Octocrab;
 
 enum Command {
     Snapshot(Snapshot),

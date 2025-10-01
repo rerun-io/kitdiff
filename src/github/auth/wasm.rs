@@ -21,7 +21,11 @@ pub fn check_for_auth_callback(sender: AuthSender) {
                 let path = window.location().pathname().unwrap_or_default();
                 let search = window.location().search().unwrap_or_default();
                 let new_url = format!("{}{}", path, search);
-                let _ = window.history().unwrap().replace_state_with_url(&JsValue::NULL, "", Some(&new_url));
+                let _ = window.history().unwrap().replace_state_with_url(
+                    &JsValue::NULL,
+                    "",
+                    Some(&new_url),
+                );
                 spawn(async move {
                     GitHubAuth::handle_callback_fragment(sender, hash).await;
                 });

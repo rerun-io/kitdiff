@@ -5,9 +5,9 @@ use eframe::egui::Context;
 use egui_inbox::UiInbox;
 use ignore::WalkBuilder;
 use ignore::types::TypesBuilder;
+use octocrab::Octocrab;
 use std::path::{Path, PathBuf};
 use std::task::Poll;
-use octocrab::Octocrab;
 
 pub struct FileLoader {
     base_path: PathBuf,
