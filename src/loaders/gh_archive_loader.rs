@@ -128,9 +128,8 @@ impl LoadSnapshots for GHArtifactLoader {
 
     fn files_header(&self) -> String {
         match &self.state {
-            LoaderState::LoadingData(_) => "Github Artifact".to_owned(),
+            LoaderState::LoadingData(_) | LoaderState::Error(_) => "Github Artifact".to_owned(),
             LoaderState::LoadingArchive(loader) => loader.files_header(),
-            LoaderState::Error(_) => "Github Artifact".to_owned(),
         }
     }
 

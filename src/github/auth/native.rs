@@ -16,7 +16,6 @@ pub fn login_github(ctx: &Context, tx: AuthSender) {
     });
 }
 
-#[allow(clippy::needless_pass_by_value)]
 pub fn check_for_auth_callback(_sender: AuthSender) {
     // Not implemented for native
 }

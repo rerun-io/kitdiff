@@ -246,26 +246,26 @@ async fn get_pr_commits(repo: &RepoClient, pr: PrNumber) -> Result<PrWithCommits
         #[expect(clippy::iter_over_hash_type)]
         for suite in last_suite_per_workflow.values() {
             let pending = match suite.status {
-                pr_details_query::CheckStatusState::COMPLETED => false,
-                pr_details_query::CheckStatusState::IN_PROGRESS => true,
-                pr_details_query::CheckStatusState::PENDING => true,
-                pr_details_query::CheckStatusState::QUEUED => true,
-                pr_details_query::CheckStatusState::REQUESTED => true,
-                pr_details_query::CheckStatusState::WAITING => true,
-                pr_details_query::CheckStatusState::Other(_) => false,
+                pr_details_query::CheckStatusState::IN_PROGRESS
+                | pr_details_query::CheckStatusState::PENDING
+                | pr_details_query::CheckStatusState::QUEUED
+                | pr_details_query::CheckStatusState::REQUESTED
+                | pr_details_query::CheckStatusState::WAITING => true,
+                pr_details_query::CheckStatusState::COMPLETED
+                | pr_details_query::CheckStatusState::Other(_) => false,
             };
             let error = if let Some(conclusion) = &suite.conclusion {
                 match conclusion {
-                    pr_details_query::CheckConclusionState::ACTION_REQUIRED => true,
-                    pr_details_query::CheckConclusionState::CANCELLED => true,
-                    pr_details_query::CheckConclusionState::FAILURE => true,
-                    pr_details_query::CheckConclusionState::NEUTRAL => false,
-                    pr_details_query::CheckConclusionState::SKIPPED => false,
-                    pr_details_query::CheckConclusionState::STALE => false,
-                    pr_details_query::CheckConclusionState::STARTUP_FAILURE => true,
-                    pr_details_query::CheckConclusionState::SUCCESS => false,
-                    pr_details_query::CheckConclusionState::TIMED_OUT => true,
-                    pr_details_query::CheckConclusionState::Other(_) => true,
+                    pr_details_query::CheckConclusionState::ACTION_REQUIRED
+                    | pr_details_query::CheckConclusionState::CANCELLED
+                    | pr_details_query::CheckConclusionState::FAILURE
+                    | pr_details_query::CheckConclusionState::STARTUP_FAILURE
+                    | pr_details_query::CheckConclusionState::TIMED_OUT
+                    | pr_details_query::CheckConclusionState::Other(_) => true,
+                    pr_details_query::CheckConclusionState::NEUTRAL
+                    | pr_details_query::CheckConclusionState::SKIPPED
+                    | pr_details_query::CheckConclusionState::STALE
+                    | pr_details_query::CheckConclusionState::SUCCESS => false,
                 }
             } else {
                 false
