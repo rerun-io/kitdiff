@@ -121,7 +121,7 @@ impl GitHubAuth {
     pub const SUPABASE_ANON_KEY: &'static str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxaHNhZXlqcXJqbWxrcWZsdmhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgyMTk4MzIsImV4cCI6MjA3Mzc5NTgzMn0.TuhMjHhBCNyKquyVWq3djOfpBVDhcpSmNRWSErpseuw";
 
     pub fn new(state: AuthState, sender: UiInboxSender<SystemCommand>) -> Self {
-        let mut this = Self {
+        let this = Self {
             state,
             inbox: UiInbox::new(),
             sender,
@@ -150,6 +150,7 @@ impl GitHubAuth {
     //     }
     // }
 
+    #[expect(clippy::needless_pass_by_value)]
     pub fn handle(&mut self, ctx: &Context, cmd: GithubAuthCommand) {
         match cmd {
             GithubAuthCommand::Login => auth_impl::login_github(ctx, self.inbox.sender()),

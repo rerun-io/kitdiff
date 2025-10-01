@@ -24,15 +24,16 @@ impl FileLoader {
 
         {
             let base_path = base_path.clone();
-            std::thread::spawn(move || {
-                let mut types_builder = TypesBuilder::new();
-                types_builder.add("png", "*.png").unwrap();
-                types_builder.select("png");
-                let types = types_builder.build().unwrap();
+            std::thread::Builder::new()
+                .name(format!("File loader {}", base_path.display()))
+                .spawn(move || {
+                    let mut types_builder = TypesBuilder::new();
+                    types_builder.add("png", "*.png").unwrap();
+                    types_builder.select("png");
+                    let types = types_builder.build().expect("Failed to build types");
 
-                #[expect(clippy::excessive_nesting)]
-                for result in WalkBuilder::new(&base_path).types(types).build() {
-                    if let Ok(entry) = result {
+                    #[expect(clippy::excessive_nesting)]
+                    for entry in WalkBuilder::new(&base_path).types(types).build().flatten() {
                         if entry.file_type().is_some_and(|ft| ft.is_file()) {
                             if let Some(snapshot) = try_create_snapshot(entry.path(), &base_path) {
                                 if sender.send(Some(snapshot)).is_err() {
@@ -41,11 +42,10 @@ impl FileLoader {
                             }
                         }
                     }
-                }
 
-                // Signal completion
-                sender.send(None).ok();
-            });
+                    // Signal completion
+                    sender.send(None).ok();
+                }).expect("Failed to spawn file loader thread");
         }
 
         Self {

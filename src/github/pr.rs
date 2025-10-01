@@ -19,7 +19,7 @@ use re_ui::{OnResponseExt as _, SectionCollapsingHeader, UiExt as _, icons};
 // use chrono::DateTime;
 pub type GitObjectID = String;
 pub type DateTime = String;
-#[allow(clippy::upper_case_acronyms)]
+#[expect(clippy::upper_case_acronyms)]
 pub type URI = String;
 
 // The paths are relative to the directory where your `Cargo.toml` is located.

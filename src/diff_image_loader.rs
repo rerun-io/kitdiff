@@ -49,7 +49,10 @@ impl DiffUri {
     }
 
     pub fn to_uri(&self) -> String {
-        format!("diff://{}", serde_json::to_string(self).expect("Failed to serialize DiffUri"))
+        format!(
+            "diff://{}",
+            serde_json::to_string(self).expect("Failed to serialize DiffUri")
+        )
     }
 }
 
@@ -116,11 +119,14 @@ impl ImageLoader for DiffImageLoader {
 
                 let uri = uri.to_owned();
                 #[cfg(not(target_arch = "wasm32"))]
-                std::thread::Builder::new().name(format!("diff for {uri}")).spawn(move || {
-                    ctx.request_repaint();
-                    let result = load_diffs(&ctx, &old_image, &new_image, size_hint, &diff_uri);
-                    cache.lock().insert(uri, result.map(Poll::Ready));
-                }).expect("Failed to spawn diff thread");
+                std::thread::Builder::new()
+                    .name(format!("diff for {uri}"))
+                    .spawn(move || {
+                        ctx.request_repaint();
+                        let result = load_diffs(&ctx, &old_image, &new_image, size_hint, &diff_uri);
+                        cache.lock().insert(uri, result.map(Poll::Ready));
+                    })
+                    .expect("Failed to spawn diff thread");
                 #[cfg(target_arch = "wasm32")]
                 {
                     wasm_bindgen_futures::spawn_local(async move {

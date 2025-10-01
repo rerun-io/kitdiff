@@ -40,19 +40,22 @@ impl GitLoader {
 
         {
             let base_path = base_path.clone();
-            std::thread::spawn(move || {
-                let result = run_git_discovery(sender.clone(), &base_path);
-                match result {
-                    Ok(()) => {
-                        // Signal done
-                        sender.send(Command::Done).ok();
+            std::thread::Builder::new()
+                .name(format!("Git loader {}", base_path.display()))
+                .spawn(move || {
+                    let result = run_git_discovery(&sender, &base_path);
+                    match result {
+                        Ok(()) => {
+                            // Signal done
+                            sender.send(Command::Done).ok();
+                        }
+                        Err(e) => {
+                            // Send error
+                            sender.send(Command::Error(e)).ok();
+                        }
                     }
-                    Err(e) => {
-                        // Send error
-                        sender.send(Command::Error(e)).ok();
-                    }
-                }
-            });
+                })
+                .expect("Failed to spawn git loader thread");
         }
 
         Self {
@@ -118,7 +121,7 @@ pub enum GitError {
     RepoNotFound,
     BranchNotFound,
     FileNotFound,
-    GitError(git2::Error),
+    Git2(git2::Error),
     IoError(std::io::Error),
     PrUrlParseError,
     NetworkError(String),
@@ -130,7 +133,7 @@ impl Display for GitError {
             Self::RepoNotFound => write!(f, "Git repository not found"),
             Self::BranchNotFound => write!(f, "Default branch not found"),
             Self::FileNotFound => write!(f, "File not found in git tree"),
-            Self::GitError(err) => write!(f, "Git error: {err}"),
+            Self::Git2(err) => write!(f, "Git error: {err}"),
             Self::IoError(err) => write!(f, "IO error: {err}"),
             Self::PrUrlParseError => write!(f, "Failed to parse PR URL"),
             Self::NetworkError(msg) => write!(f, "Network error: {msg}"),
@@ -142,7 +145,7 @@ impl std::error::Error for GitError {}
 
 impl From<git2::Error> for GitError {
     fn from(err: git2::Error) -> Self {
-        Self::GitError(err)
+        Self::Git2(err)
     }
 }
 
@@ -152,7 +155,7 @@ impl From<std::io::Error> for GitError {
     }
 }
 
-fn run_git_discovery(sender: Sender, base_path: &Path) -> Result<(), GitError> {
+fn run_git_discovery(sender: &Sender, base_path: &Path) -> Result<(), GitError> {
     // Open git repository in current directory
     let repo = Repository::open(base_path).map_err(|_err| GitError::RepoNotFound)?;
 

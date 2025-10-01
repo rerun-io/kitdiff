@@ -172,7 +172,7 @@ fn get_snapshots(files: &HashMap<PathBuf, Vec<u8>>) -> Vec<Snapshot> {
             continue;
         }
 
-        if let Some(snapshot) = try_create_snapshot(png_path, &files) {
+        if let Some(snapshot) = try_create_snapshot(png_path, files) {
             // Mark related files as processed
             processed_files.insert(png_path.clone());
             if let Some(old_path) = get_variant_path(png_path, "old") {
