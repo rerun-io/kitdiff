@@ -1,3 +1,4 @@
+use crate::github::auth::parse_github_artifact_url;
 use crate::github::model::{GithubArtifactLink, GithubPrLink};
 pub use crate::loaders::{DataReference, SnapshotLoader};
 use crate::state::AppState;
@@ -29,6 +30,17 @@ pub enum DiffSource {
 }
 
 impl DiffSource {
+    pub fn from_url(url: &str) -> Self {
+        if let Ok(link) = url.parse() {
+            Self::Pr(link)
+        } else if let Some(link) = parse_github_artifact_url(url) {
+            return Self::GHArtifact(link);
+        } else {
+            // Try to load it as direct zip/tar.gz URL
+            Self::Archive(DataReference::Url(url.to_owned()))
+        }
+    }
+
     pub fn load(self, _ctx: &Context, state: &AppState) -> SnapshotLoader {
         match self {
             #[cfg(not(target_arch = "wasm32"))]
