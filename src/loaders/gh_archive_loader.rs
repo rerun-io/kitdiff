@@ -156,7 +156,6 @@ impl LoadSnapshots for GHArtifactLoader {
                             git_ref,
                         )
                         .inputs(json!({
-                            "artifact_id": artifact.artifact_id.to_string(),
                             "run_id": run_id.to_string(),
                         }))
                         .send()
