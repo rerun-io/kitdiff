@@ -3,7 +3,6 @@ mod cli;
 
 #[cfg(not(target_arch = "wasm32"))]
 use eframe::NativeOptions;
-use kitdiff::DiffSource;
 use kitdiff::app::App;
 use kitdiff::config::Config;
 
@@ -20,13 +19,15 @@ fn main() -> eframe::Result<()> {
 
     let source = mode
         .command
-        .map(|c| c.to_source())
-        .unwrap_or(DiffSource::Files(".".into()));
+        .unwrap_or(cli::Commands::Files {
+            directory: Some(".".into()),
+        })
+        .to_source();
 
     eframe::run_native(
         "kitdiff",
         NativeOptions::default(),
-        Box::new(move |cc| Ok(Box::new(App::new(cc, Some(source), Config::default())))),
+        Box::new(move |cc| Ok(Box::new(App::new(cc, source, Config::default())))),
     )
 }
 

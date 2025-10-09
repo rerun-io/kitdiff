@@ -12,6 +12,8 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
+    /// Just show the kitdiff start page
+    Ui,
     /// Compare snapshot test files (.png with .old/.new/.diff variants) (default)
     Files { directory: Option<String> },
     /// Compare images between current branch and default branch
@@ -25,8 +27,9 @@ pub enum Commands {
 }
 
 impl Commands {
-    pub fn to_source(&self) -> DiffSource {
-        match self {
+    pub fn to_source(&self) -> Option<DiffSource> {
+        Some(match self {
+            Self::Ui => return None,
             Self::Files { directory } => {
                 DiffSource::Files(directory.clone().unwrap_or_else(|| ".".into()).into())
             }
@@ -57,6 +60,6 @@ impl Commands {
                     panic!("Invalid GitHub artifact URL: {url}");
                 }
             }
-        }
+        })
     }
 }
