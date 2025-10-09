@@ -72,9 +72,9 @@ opt-level = 2
 [patch.crates-io]
 
 # If you want to use the bleeding edge version of egui and eframe:
-egui = { git = "https://github.com/emilk/egui", branch = "lucas/experiments/kitdiff" }
-eframe = { git = "https://github.com/emilk/egui", branch = "lucas/experiments/kitdiff" }
-egui_extras = { git = "https://github.com/emilk/egui", branch = "lucas/experiments/kitdiff" }
+egui = { git = "https://github.com/emilk/egui", branch = "main" }
+eframe = { git = "https://github.com/emilk/egui", branch = "main" }
+egui_extras = { git = "https://github.com/emilk/egui", branch = "main" }
 
 re_ui = { git = "https://github.com/rerun-io/rerun", branch = "main" }
 egui_commonmark = { git = "https://github.com/rerun-io/egui_commonmark.git", branch = "lucas/update-egui-main" }
