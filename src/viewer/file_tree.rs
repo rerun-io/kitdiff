@@ -38,13 +38,18 @@ pub fn file_tree(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
 
     ScrollArea::vertical().show(ui, |ui| {
         ui.list_item_scope("file_tree", |ui| {
-            let mut tree = BTreeMap::new();
+            let mut tree: Vec<(Option<&str>, Vec<FilteredSnapshot>)> = Vec::new();
 
-            for (snapshot_index, snapshot) in &state.filtered_snapshots {
-                let prefix = snapshot.path.parent().and_then(|p| p.to_str());
-                tree.entry(prefix)
-                    .or_insert(vec![])
-                    .push((*snapshot_index, *snapshot));
+            // Snapshots should already be sorted, so we only need to group them
+            for filtered_snapshot in state.filtered_snapshots.iter().copied() {
+                let prefix = filtered_snapshot.1.path.parent().and_then(|p| p.to_str());
+                if let Some((current_prefix, snapshots)) = tree.last_mut() {
+                    if *current_prefix == prefix {
+                        snapshots.push(filtered_snapshot);
+                        continue;
+                    }
+                }
+                tree.push((prefix, vec![filtered_snapshot]));
             }
 
             for (prefix, snapshots) in tree {

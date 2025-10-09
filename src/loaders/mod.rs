@@ -67,6 +67,12 @@ impl DataReference {
     }
 }
 
+/// Sort the snapshots. It'll sort them so folders come first and then files.
 pub fn sort_snapshots(snapshots: &mut [Snapshot]) {
-    snapshots.sort_by_key(|s| s.path.to_string_lossy().to_lowercase());
+    snapshots.sort_by_key(|s| {
+        let parent = s.path.parent().map(|p| p.to_string_lossy().to_lowercase()).unwrap_or_default();
+        let depth = s.path.components().count();
+        let name = s.path.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
+        (parent, depth, name)
+    });
 }
