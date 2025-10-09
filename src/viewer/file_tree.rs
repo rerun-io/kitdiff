@@ -3,7 +3,6 @@ use eframe::egui;
 use eframe::egui::{Id, ScrollArea, TextEdit, Ui, Widget as _};
 use re_ui::list_item::LabelContent;
 use re_ui::{UiExt as _, icons};
-use std::collections::BTreeMap;
 use std::task::Poll;
 
 pub fn file_tree(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
@@ -38,7 +37,7 @@ pub fn file_tree(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
 
     ScrollArea::vertical().show(ui, |ui| {
         ui.list_item_scope("file_tree", |ui| {
-            let mut tree: Vec<(Option<&str>, Vec<FilteredSnapshot>)> = Vec::new();
+            let mut tree: Vec<(Option<&str>, Vec<FilteredSnapshot<'_>>)> = Vec::new();
 
             // Snapshots should already be sorted, so we only need to group them
             for filtered_snapshot in state.filtered_snapshots.iter().copied() {
