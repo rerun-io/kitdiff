@@ -18,32 +18,32 @@ targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
 
 
 [dependencies]
+anyhow = "1.0.99"
+bytes = "1.10.1"
+chrono = { version = "0.4", features = ["serde"] }
+dify = "0.7"
 eframe = { version = "0.33.0", features = ["glow", "default", "persistence", "ron"] }
 egui_extras = { version = "0.33.0", features = ["image", "file", "http"] }
+egui_inbox = { version = "0.10.0", features = ["async", "tokio"] }
 ehttp = { version = "0.5", features = ["native-async"] }
-dify = "0.7"
-serde = "1"
-serde_json = "1.0"
-image = "0.25.8"
-tempfile = { version = "3.0" }
-zip = { version = "5", default-features = false, features = ["deflate"] }
 flate2 = { version = "1.1" }
-tar = { version = "0.4" }
-chrono = { version = "0.4", features = ["serde"] }
+futures = "0.3"
+getrandom = { version = "0.3", features = ["wasm_js"] }
+graphql_client = "0.14.0"
+hello_egui_utils = "0.10.0"
+image = "0.25.8"
 octocrab = { version = "0.45.0", default-features = false, features = ["stream"] }
 octocrab-wasm = { path = "crates/octocrab-wasm" }
-egui_inbox = { version = "0.10.0", features = ["async", "tokio"] }
-futures = "0.3"
 re_ui = { git = "https://github.com/rerun-io/rerun", branch = "main" }
-getrandom = { version = "0.3", features = ["wasm_js"] }
-anyhow = "1.0.99"
-graphql_client = "0.14.0"
-thiserror = "1.0.69"
-bytes = "1.10.1"
 reqwest = "0.12.23"
-hello_egui_utils = "0.10.0"
+serde = "1"
+serde_json = "1.0"
 serde_urlencoded = "0.7"
+tar = { version = "0.4" }
+tempfile = { version = "3.0" }
+thiserror = "1.0.69"
 web-time = "1"
+zip = { version = "5", default-features = false, features = ["deflate"] }
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
