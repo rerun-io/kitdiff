@@ -34,7 +34,7 @@ fn main() -> eframe::Result<()> {
 }
 
 #[cfg(target_arch = "wasm32")]
-fn parse_url_query_params() -> Option<crate::DiffSource> {
+fn parse_url_query_params() -> Option<kitdiff::DiffSource> {
     if let Some(window) = web_sys::window() {
         if let Ok(search) = window.location().search() {
             let search = search.strip_prefix('?').unwrap_or(&search);
@@ -45,7 +45,7 @@ fn parse_url_query_params() -> Option<crate::DiffSource> {
                     if key == "url" {
                         // URL decode the value
                         let decoded_url = js_sys::decode_uri_component(value).ok()?.as_string()?;
-                        return Some(crate::DiffSource::from_url(&decoded_url));
+                        return Some(kitdiff::DiffSource::from_url(&decoded_url));
                     }
                 }
             }
