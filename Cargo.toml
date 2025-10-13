@@ -18,50 +18,50 @@ targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
 
 
 [dependencies]
-anyhow = "1.0.99"
+anyhow = "1.0.100"
 bytes = "1.10.1"
-chrono = { version = "0.4", features = ["serde"] }
-dify = "0.7"
+chrono = { version = "0.4.42", features = ["serde"] }
+dify = "0.7.4"
 eframe = { version = "0.33.0", features = ["glow", "default", "persistence", "ron"] }
 egui_extras = { version = "0.33.0", features = ["image", "file", "http"] }
 egui_inbox = { version = "0.10.0", features = ["async", "tokio"] }
-ehttp = { version = "0.5", features = ["native-async"] }
-env_logger = { version = "0.11", default-features=false, features = ["auto-color", "humantime"] }
+ehttp = { version = "0.5.0", features = ["native-async"] }
+env_logger = { version = "0.11.8", default-features=false, features = ["auto-color", "humantime"] }
 flate2 = { version = "1.1" }
-futures = "0.3"
+futures = "0.3.31"
 getrandom = { version = "0.3", features = ["wasm_js"] }
 graphql_client = "0.14.0"
 hello_egui_utils = "0.10.0"
 image = "0.25.8"
 log = "0.4.28"
-octocrab = { version = "0.45.0", default-features = false, features = ["stream"] }
+octocrab = { version = "0.47.0", default-features = false, features = ["stream"] }
 octocrab-wasm = { path = "crates/octocrab-wasm" }
 re_ui = { git = "https://github.com/rerun-io/rerun", branch = "main" }
 reqwest = "0.12.23"
-serde = "1"
+serde = "1.0"
 serde_json = "1.0"
-serde_urlencoded = "0.7"
-tar = { version = "0.4" }
-tempfile = { version = "3.0" }
-thiserror = "1.0.69"
-web-time = "1"
-zip = { version = "5", default-features = false, features = ["deflate"] }
+serde_urlencoded = "0.7.1"
+tar = { version = "0.4.44" }
+tempfile = { version = "3.23" }
+thiserror = "2.0.17"
+web-time = "1.1"
+zip = { version = "6.0.0", default-features = false, features = ["deflate"] }
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 axum = "0.8.6"
+clap = { version = "4.5", features = ["derive"] }
 env_logger = "0.11.8"
+git2 = { version = "0.20.2" }
 ignore = { version = "0.4" }
-clap = { version = "4.0", features = ["derive"] }
-git2 = { version = "0.18" }
-tokio = { version = "1.0", features = ["full"] }
+tokio = { version = "1.47", features = ["full"] }
 
 # web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen-futures = { version = "0.4" }
-wasm-bindgen = { version = "0.2" }
-js-sys = { version = "0.3" }
-web-sys = { version = "0.3", features = ["Window", "Location", "History", "Navigator", "Clipboard", "Performance"] }
+js-sys = { version = "0.3.81" }
+wasm-bindgen = { version = "0.2.104" }
+wasm-bindgen-futures = { version = "0.4.54" }
+web-sys = { version = "0.3.81", features = ["Window", "Location", "History", "Navigator", "Clipboard", "Performance"] }
 
 [profile.release]
 opt-level = 2 # fast and small wasm
