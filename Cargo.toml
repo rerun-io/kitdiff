@@ -18,8 +18,8 @@ targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
 
 
 [dependencies]
-eframe = { version = "0.32.3", features = ["glow", "default", "persistence", "ron"] }
-egui_extras = { version = "0.32.3", features = ["image", "file", "http"] }
+eframe = { version = "0.33.0", features = ["glow", "default", "persistence", "ron"] }
+egui_extras = { version = "0.33.0", features = ["image", "file", "http"] }
 ehttp = { version = "0.5", features = ["native-async"] }
 dify = "0.7"
 serde = "1"
@@ -32,16 +32,16 @@ tar = { version = "0.4" }
 chrono = { version = "0.4", features = ["serde"] }
 octocrab = { version = "0.45.0", default-features = false, features = ["stream"] }
 octocrab-wasm = { path = "crates/octocrab-wasm" }
-egui_inbox = { version = "0.9.0", features = ["async", "tokio"] }
+egui_inbox = { version = "0.10.0", features = ["async", "tokio"] }
 futures = "0.3"
-re_ui = "0.26.0-alpha.1+dev"
+re_ui = { git = "https://github.com/rerun-io/rerun", branch = "main" }
 getrandom = { version = "0.3", features = ["wasm_js"] }
 anyhow = "1.0.99"
 graphql_client = "0.14.0"
 thiserror = "1.0.69"
 bytes = "1.10.1"
 reqwest = "0.12.23"
-hello_egui_utils = "0.9.0"
+hello_egui_utils = "0.10.0"
 serde_urlencoded = "0.7"
 web-time = "1"
 
@@ -72,12 +72,12 @@ opt-level = 2
 [patch.crates-io]
 
 # If you want to use the bleeding edge version of egui and eframe:
-egui = { git = "https://github.com/emilk/egui", branch = "main" }
-eframe = { git = "https://github.com/emilk/egui", branch = "main" }
-egui_extras = { git = "https://github.com/emilk/egui", branch = "main" }
+# egui = { git = "https://github.com/emilk/egui", branch = "main" }
+# eframe = { git = "https://github.com/emilk/egui", branch = "main" }
+# egui_extras = { git = "https://github.com/emilk/egui", branch = "main" }
 
-re_ui = { git = "https://github.com/rerun-io/rerun", branch = "main" }
-egui_commonmark = { git = "https://github.com/rerun-io/egui_commonmark.git", branch = "lucas/update-egui-main" }
+# re_ui = { git = "https://github.com/rerun-io/rerun", branch = "main" }
+# egui_commonmark = { git = "https://github.com/rerun-io/egui_commonmark.git", branch = "lucas/update-egui-main" }
 
 # If you fork https://github.com/emilk/egui you can test with:
 # egui = { path = "../egui/crates/egui" }
@@ -237,7 +237,6 @@ string_add = "warn"
 string_add_assign = "warn"
 string_lit_as_bytes = "warn"
 string_lit_chars_any = "warn"
-string_to_string = "warn"
 suspicious_command_arg_space = "warn"
 suspicious_xor_used_as_pow = "warn"
 todo = "warn"

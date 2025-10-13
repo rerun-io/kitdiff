@@ -1517,19 +1517,21 @@ checksum = "d8b14ccef22fc6f5a8f4d7d768562a182c04ce9a3b3157b91390b52ddfdf1a76"
 
 [[package]]
 name = "ecolor"
-version = "0.32.3"
-source = "git+https://github.com/emilk/egui?branch=main#82b6b3c98d5d01159d7b4387445034c73a9ed47a"
+version = "0.33.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "adf31f99fad93fe83c1055b92b5c1b135f1ecfa464789817c372000e768d4bd1"
 dependencies = [
  "bytemuck",
  "color-hex",
- "emath 0.32.3 (git+https://github.com/emilk/egui?branch=main)",
+ "emath",
  "serde",
 ]
 
 [[package]]
 name = "eframe"
-version = "0.32.3"
-source = "git+https://github.com/emilk/egui?branch=main#82b6b3c98d5d01159d7b4387445034c73a9ed47a"
+version = "0.33.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b829d302a09deb4acde242262a1840ba14fadd0371980ebf713060077a1987bc"
 dependencies = [
  "ahash",
  "bytemuck",
@@ -1567,14 +1569,15 @@ dependencies = [
 
 [[package]]
 name = "egui"
-version = "0.32.3"
-source = "git+https://github.com/emilk/egui?branch=main#82b6b3c98d5d01159d7b4387445034c73a9ed47a"
+version = "0.33.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab9b5d3376c79439f53a78bf7da1e3c0b862ffa3e29f46ab0f3e107430f2e576"
 dependencies = [
  "accesskit",
  "ahash",
  "backtrace",
  "bitflags 2.9.4",
- "emath 0.32.3 (git+https://github.com/emilk/egui?branch=main)",
+ "emath",
  "epaint",
  "log",
  "nohash-hasher",
@@ -1587,8 +1590,9 @@ dependencies = [
 
 [[package]]
 name = "egui-wgpu"
-version = "0.32.3"
-source = "git+https://github.com/emilk/egui?branch=main#82b6b3c98d5d01159d7b4387445034c73a9ed47a"
+version = "0.33.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cef1fe83ba30b3d045814b2d811804f2a7e50a832034c975408f71c20df596e4"
 dependencies = [
  "ahash",
  "bytemuck",
@@ -1606,8 +1610,9 @@ dependencies = [
 
 [[package]]
 name = "egui-winit"
-version = "0.32.3"
-source = "git+https://github.com/emilk/egui?branch=main#82b6b3c98d5d01159d7b4387445034c73a9ed47a"
+version = "0.33.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb4ea8cb063c00d8f23ce11279c01eb63a195a72be0e21d429148246dab7983e"
 dependencies = [
  "accesskit_winit",
  "arboard",
@@ -1628,8 +1633,9 @@ dependencies = [
 
 [[package]]
 name = "egui_commonmark"
-version = "0.21.1"
-source = "git+https://github.com/rerun-io/egui_commonmark.git?branch=lucas%2Fupdate-egui-main#361af065d90fd9c04c232aa50701aefdf956dc46"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d5246a4e9b83c345ec8230933bd0dca16d1c3c11db0edd4fd9c1a90683240b49"
 dependencies = [
  "egui",
  "egui_commonmark_backend",
@@ -1639,8 +1645,9 @@ dependencies = [
 
 [[package]]
 name = "egui_commonmark_backend"
-version = "0.21.0"
-source = "git+https://github.com/rerun-io/egui_commonmark.git?branch=lucas%2Fupdate-egui-main#361af065d90fd9c04c232aa50701aefdf956dc46"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3cff846279556f57af8ea606f2e4ceaf83e60b81db014c126dfb926fa06c75b"
 dependencies = [
  "egui",
  "egui_extras",
@@ -1649,8 +1656,9 @@ dependencies = [
 
 [[package]]
 name = "egui_extras"
-version = "0.32.3"
-source = "git+https://github.com/emilk/egui?branch=main#82b6b3c98d5d01159d7b4387445034c73a9ed47a"
+version = "0.33.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bdced1964ad8a02a116b1307f7b4f73dbe408c5f53dcdd488f527609f261da60"
 dependencies = [
  "ahash",
  "egui",
@@ -1666,8 +1674,9 @@ dependencies = [
 
 [[package]]
 name = "egui_glow"
-version = "0.32.3"
-source = "git+https://github.com/emilk/egui?branch=main#82b6b3c98d5d01159d7b4387445034c73a9ed47a"
+version = "0.33.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "668c0d4f726cc33838f0915f6b8c00af0ca0910e975ab58cf34b3e39c614552c"
 dependencies = [
  "bytemuck",
  "egui",
@@ -1682,9 +1691,9 @@ dependencies = [
 
 [[package]]
 name = "egui_inbox"
-version = "0.9.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8031fefc60b0170b304a8b12df0bd3531359410c3e709a2ccf33f7f58f856428"
+checksum = "da31d355094b21970302411fb9bd23d3d7642077d46387b7d4e59323392e69d2"
 dependencies = [
  "egui",
  "futures",
@@ -1695,9 +1704,9 @@ dependencies = [
 
 [[package]]
 name = "egui_tiles"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b1545ed157141c0fa3ef34e03104b53f68d720a37535a6f4ba252770aa6fb1f"
+checksum = "ebfac3ca35f5e4fe217d3b03312111b234fe55ce059faf62b4cb47f7cf6d54f1"
 dependencies = [
  "ahash",
  "egui",
@@ -1729,14 +1738,9 @@ checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 
 [[package]]
 name = "emath"
-version = "0.32.3"
+version = "0.33.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45fd7bc25f769a3c198fe1cf183124bf4de3bd62ef7b4f1eaf6b08711a3af8db"
-
-[[package]]
-name = "emath"
-version = "0.32.3"
-source = "git+https://github.com/emilk/egui?branch=main#82b6b3c98d5d01159d7b4387445034c73a9ed47a"
+checksum = "c615516cdceec867065f20d7db13d8eb8aedd65c9e32cc0c7c379380fa42e6e8"
 dependencies = [
  "bytemuck",
  "serde",
@@ -1835,14 +1839,15 @@ dependencies = [
 
 [[package]]
 name = "epaint"
-version = "0.32.3"
-source = "git+https://github.com/emilk/egui?branch=main#82b6b3c98d5d01159d7b4387445034c73a9ed47a"
+version = "0.33.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9926b9500ccb917adb070207ec722dd8ea78b8321f94a85ebec776f501f2930c"
 dependencies = [
  "ab_glyph",
  "ahash",
  "bytemuck",
  "ecolor",
- "emath 0.32.3 (git+https://github.com/emilk/egui?branch=main)",
+ "emath",
  "epaint_default_fonts",
  "log",
  "nohash-hasher",
@@ -1854,8 +1859,9 @@ dependencies = [
 
 [[package]]
 name = "epaint_default_fonts"
-version = "0.32.3"
-source = "git+https://github.com/emilk/egui?branch=main#82b6b3c98d5d01159d7b4387445034c73a9ed47a"
+version = "0.33.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66054d943c66715c6003a27a3dc152d87cadf714ef2597ccd79f550413009b97"
 
 [[package]]
 name = "equator"
@@ -2584,9 +2590,9 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "hello_egui_utils"
-version = "0.9.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea8d21d4cd2b323f7703a43fb72c0f58da649387538a96c67b02fc3967ed55dc"
+checksum = "f5d09c2c7f3aa61624b1bec320be9029f30e06769f92e39ac99a6d6e01024ae8"
 dependencies = [
  "concat-idents",
  "egui",
@@ -2775,7 +2781,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.0",
+ "windows-core 0.58.0",
 ]
 
 [[package]]
@@ -4886,7 +4892,7 @@ dependencies = [
 [[package]]
 name = "re_arrow_util"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "anyhow",
  "arrow",
@@ -4899,7 +4905,7 @@ dependencies = [
 [[package]]
 name = "re_build_info"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "re_byte_size",
  "serde",
@@ -4908,7 +4914,7 @@ dependencies = [
 [[package]]
 name = "re_build_tools"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -4922,7 +4928,7 @@ dependencies = [
 [[package]]
 name = "re_byte_size"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "arrow",
  "half",
@@ -4932,7 +4938,7 @@ dependencies = [
 [[package]]
 name = "re_case"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "convert_case",
 ]
@@ -4940,7 +4946,7 @@ dependencies = [
 [[package]]
 name = "re_chunk"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4971,7 +4977,7 @@ dependencies = [
 [[package]]
 name = "re_chunk_store"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4999,11 +5005,11 @@ dependencies = [
 [[package]]
 name = "re_entity_db"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "ahash",
  "document-features",
- "emath 0.32.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "emath",
  "indexmap",
  "itertools 0.14.0",
  "nohash-hasher",
@@ -5031,12 +5037,12 @@ dependencies = [
 [[package]]
 name = "re_error"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 
 [[package]]
 name = "re_format"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "half",
  "num-traits",
@@ -5045,7 +5051,7 @@ dependencies = [
 [[package]]
 name = "re_format_arrow"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "arrow",
  "comfy-table",
@@ -5059,7 +5065,7 @@ dependencies = [
 [[package]]
 name = "re_int_histogram"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "smallvec",
  "static_assertions",
@@ -5068,7 +5074,7 @@ dependencies = [
 [[package]]
 name = "re_log"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "env_filter",
  "env_logger",
@@ -5083,7 +5089,7 @@ dependencies = [
 [[package]]
 name = "re_log_encoding"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "arrow",
  "bytes",
@@ -5106,7 +5112,7 @@ dependencies = [
 [[package]]
 name = "re_log_types"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "ahash",
  "arrow",
@@ -5141,7 +5147,7 @@ dependencies = [
 [[package]]
 name = "re_protos"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "arrow",
  "http",
@@ -5166,7 +5172,7 @@ dependencies = [
 [[package]]
 name = "re_query"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "ahash",
  "anyhow",
@@ -5193,7 +5199,7 @@ dependencies = [
 [[package]]
 name = "re_smart_channel"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "crossbeam",
  "parking_lot",
@@ -5207,7 +5213,7 @@ dependencies = [
 [[package]]
 name = "re_sorbet"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "arrow",
  "itertools 0.14.0",
@@ -5228,7 +5234,7 @@ dependencies = [
 [[package]]
 name = "re_span"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "num-traits",
 ]
@@ -5236,7 +5242,7 @@ dependencies = [
 [[package]]
 name = "re_string_interner"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "ahash",
  "nohash-hasher",
@@ -5248,7 +5254,7 @@ dependencies = [
 [[package]]
 name = "re_tracing"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "puffin",
 ]
@@ -5256,7 +5262,7 @@ dependencies = [
 [[package]]
 name = "re_tuid"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "bytemuck",
  "document-features",
@@ -5269,7 +5275,7 @@ dependencies = [
 [[package]]
 name = "re_types_core"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "anyhow",
  "arrow",
@@ -5293,7 +5299,7 @@ dependencies = [
 [[package]]
 name = "re_ui"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "ahash",
  "anyhow",
@@ -5328,7 +5334,7 @@ dependencies = [
 [[package]]
 name = "re_uri"
 version = "0.26.0-alpha.1+dev"
-source = "git+https://github.com/rerun-io/rerun?branch=main#78527714e9515ca607c7a78841ec8822e09a03c3"
+source = "git+https://github.com/rerun-io/rerun?branch=main#026c16058ea7fa996281a50ce7b09c8ba6dbeef5"
 dependencies = [
  "re_log_types",
  "re_tuid",
@@ -7265,19 +7271,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows-core"
-version = "0.62.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57fe7168f7de578d2d8a05b07fd61870d2e73b4020e9f49aa00da8471723497c"
-dependencies = [
- "windows-implement 0.60.0",
- "windows-interface 0.59.1",
- "windows-link 0.2.1",
- "windows-result 0.4.0",
- "windows-strings 0.5.0",
-]
-
-[[package]]
 name = "windows-future"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7384,15 +7377,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows-result"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7084dcc306f89883455a206237404d3eaf961e5bd7e0f312f7c91f57eb44167f"
-dependencies = [
- "windows-link 0.2.1",
-]
-
-[[package]]
 name = "windows-strings"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7409,15 +7393,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56e6c93f3a0c3b36176cb1327a4958a0353d5d166c2a35cb268ace15e91d3b57"
 dependencies = [
  "windows-link 0.1.3",
-]
-
-[[package]]
-name = "windows-strings"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7218c655a553b0bed4426cf54b20d7ba363ef543b52d515b3e48d7fd55318dda"
-dependencies = [
- "windows-link 0.2.1",
 ]
 
 [[package]]
