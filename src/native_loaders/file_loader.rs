@@ -40,7 +40,7 @@ impl FileLoader {
                             && sender.send(Some(snapshot)).is_err()
                         {
                             break;
-                        };
+                        }
                     }
 
                     // Signal completion
