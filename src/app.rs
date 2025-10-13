@@ -1,9 +1,9 @@
-use crate::config::Config;
 use crate::diff_image_loader::DiffImageLoader;
 use crate::settings::Settings;
 use crate::state::{AppState, AppStateRef, PageRef, SystemCommand, ViewerSystemCommand};
 use crate::{DiffSource, bar, home, viewer};
-use eframe::egui::{Context, Key, Modifiers};
+use crate::{config::Config, state::View};
+use eframe::egui::{Context, Modifiers};
 use eframe::{Frame, Storage, egui};
 use egui_extras::install_image_loaders;
 use egui_inbox::UiInbox;
@@ -172,21 +172,15 @@ impl App {
                     state.send(ViewerSystemCommand::SelectSnapshot(new_index));
                 }
 
-                let handle_key = |key: Key, toggle: &mut bool| {
-                    if ctx.input_mut(|i| i.key_pressed(key)) {
-                        *toggle = true;
+                let mut new_view = vs.state.view;
+                for view in View::ALL {
+                    if ctx.input_mut(|i| i.consume_key(Default::default(), view.key())) {
+                        new_view = view;
                     }
-                    if ctx.input_mut(|i| i.key_released(key)) {
-                        *toggle = false;
-                    }
-                };
+                }
 
-                let mut view_filter = vs.state.view_filter;
-                handle_key(Key::Num1, &mut view_filter.show_old);
-                handle_key(Key::Num2, &mut view_filter.show_new);
-                handle_key(Key::Num3, &mut view_filter.show_diff);
-                if view_filter != vs.state.view_filter {
-                    state.send(ViewerSystemCommand::SetViewFilter(view_filter));
+                if new_view != vs.state.view {
+                    state.send(ViewerSystemCommand::SetView(new_view));
                 }
             }
         }

@@ -6,7 +6,7 @@ use crate::github::pr::GithubPr;
 use crate::loaders::SnapshotLoader;
 use crate::settings::Settings;
 use crate::snapshot::Snapshot;
-use eframe::egui::Context;
+use eframe::egui::{self, Context};
 use egui_inbox::UiInboxSender;
 use octocrab::Octocrab;
 use std::ops::Deref;
@@ -31,7 +31,7 @@ pub struct ViewerState {
     /// If true, this item will scroll into view.
     pub index_just_selected: bool,
     pub filter: String,
-    pub view_filter: ViewFilter,
+    pub view: View,
 }
 
 impl ViewerState {
@@ -52,19 +52,43 @@ impl ViewerState {
     }
 }
 
-/// If any is true, only show those, but at full opacity
-///
-/// If all are false, show all at their set opacities
-#[derive(Default, Copy, Clone, PartialEq, Eq)]
-pub struct ViewFilter {
-    pub show_old: bool,
-    pub show_new: bool,
-    pub show_diff: bool,
+#[derive(Copy, Clone, Default, PartialEq, Eq)]
+pub enum View {
+    /// View all stacked on each other, with opacity settings.
+    #[default]
+    BlendAll,
+
+    /// View old image
+    Old,
+
+    /// View new image
+    New,
+
+    /// View diff
+    Diff,
 }
 
-impl ViewFilter {
-    pub fn all(&self) -> bool {
-        !self.show_old && !self.show_new && !self.show_diff
+impl std::fmt::Display for View {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            View::BlendAll => write!(f, "Blend all"),
+            View::Old => write!(f, "Old"),
+            View::New => write!(f, "New"),
+            View::Diff => write!(f, "Diff"),
+        }
+    }
+}
+
+impl View {
+    pub const ALL: [Self; 4] = [Self::BlendAll, Self::Old, Self::New, Self::Diff];
+
+    pub fn key(self) -> egui::Key {
+        match self {
+            View::BlendAll => egui::Key::Num1,
+            View::Old => egui::Key::Num2,
+            View::New => egui::Key::Num3,
+            View::Diff => egui::Key::Num4,
+        }
     }
 }
 
@@ -198,7 +222,7 @@ pub enum SystemCommand {
 pub enum ViewerSystemCommand {
     SetFilter(String),
     SelectSnapshot(usize),
-    SetViewFilter(ViewFilter),
+    SetView(View),
 }
 
 impl From<ViewerSystemCommand> for SystemCommand {
@@ -217,7 +241,7 @@ impl AppState {
                     index: 0,
                     index_just_selected: true,
                     loader,
-                    view_filter: ViewFilter::default(),
+                    view: View::default(),
                 });
             }
             SystemCommand::GithubAuth(auth) => {
@@ -270,8 +294,8 @@ impl ViewerState {
                     self.index_just_selected = true;
                 }
             }
-            ViewerSystemCommand::SetViewFilter(view_filter) => {
-                self.view_filter = view_filter;
+            ViewerSystemCommand::SetView(view_filter) => {
+                self.view = view_filter;
             }
         }
     }
