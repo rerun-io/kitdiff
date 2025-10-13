@@ -42,11 +42,11 @@ pub fn file_tree(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
             // Snapshots should already be sorted, so we only need to group them
             for filtered_snapshot in state.filtered_snapshots.iter().copied() {
                 let prefix = filtered_snapshot.1.path.parent().and_then(|p| p.to_str());
-                if let Some((current_prefix, snapshots)) = tree.last_mut() {
-                    if *current_prefix == prefix {
-                        snapshots.push(filtered_snapshot);
-                        continue;
-                    }
+                if let Some((current_prefix, snapshots)) = tree.last_mut()
+                    && *current_prefix == prefix
+                {
+                    snapshots.push(filtered_snapshot);
+                    continue;
                 }
                 tree.push((prefix, vec![filtered_snapshot]));
             }

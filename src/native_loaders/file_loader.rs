@@ -35,13 +35,12 @@ impl FileLoader {
                     let types = types_builder.build().expect("Failed to build types");
 
                     for entry in WalkBuilder::new(&base_path).types(types).build().flatten() {
-                        if entry.file_type().is_some_and(|ft| ft.is_file()) {
-                            if let Some(snapshot) = try_create_snapshot(entry.path(), &base_path) {
-                                if sender.send(Some(snapshot)).is_err() {
-                                    break;
-                                };
-                            }
-                        }
+                        if entry.file_type().is_some_and(|ft| ft.is_file())
+                            && let Some(snapshot) = try_create_snapshot(entry.path(), &base_path)
+                            && sender.send(Some(snapshot)).is_err()
+                        {
+                            break;
+                        };
                     }
 
                     // Signal completion
