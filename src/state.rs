@@ -71,10 +71,10 @@ pub enum View {
 impl std::fmt::Display for View {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            View::BlendAll => write!(f, "Blend all"),
-            View::Old => write!(f, "Old"),
-            View::New => write!(f, "New"),
-            View::Diff => write!(f, "Diff"),
+            Self::BlendAll => write!(f, "Blend all"),
+            Self::Old => write!(f, "Old"),
+            Self::New => write!(f, "New"),
+            Self::Diff => write!(f, "Diff"),
         }
     }
 }
@@ -84,10 +84,10 @@ impl View {
 
     pub fn key(self) -> egui::Key {
         match self {
-            View::BlendAll => egui::Key::Num1,
-            View::Old => egui::Key::Num2,
-            View::New => egui::Key::Num3,
-            View::Diff => egui::Key::Num4,
+            Self::BlendAll => egui::Key::Num1,
+            Self::Old => egui::Key::Num2,
+            Self::New => egui::Key::Num3,
+            Self::Diff => egui::Key::Num4,
         }
     }
 }
