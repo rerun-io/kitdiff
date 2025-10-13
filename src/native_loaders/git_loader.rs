@@ -184,7 +184,7 @@ fn run_git_discovery(sender: &Sender, base_path: &Path) -> Result<(), GitError> 
 
     // Don't compare branch with itself
     if current_branch == default_branch {
-        eprintln!("Current branch is the same as default branch ({current_branch})");
+        log::warn!("Current branch is the same as default branch ({current_branch})");
         return Ok(());
     }
 

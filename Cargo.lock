@@ -3216,6 +3216,7 @@ dependencies = [
  "ignore",
  "image",
  "js-sys",
+ "log",
  "octocrab",
  "octocrab-wasm",
  "re_ui",

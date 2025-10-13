@@ -8,6 +8,8 @@ use kitdiff::config::Config;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
+    env_logger::init();
+
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
