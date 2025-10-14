@@ -233,12 +233,12 @@ async fn get_pr_commits(repo: &RepoClient, pr: PrNumber) -> Result<PrWithCommits
         // to query all check suites and group them by workflow.
         let mut last_suite_per_workflow = HashMap::new();
 
-        if let Some(suites) = commit.check_suites {
-            if let Some(nodes) = suites.nodes {
-                for node in nodes.into_iter().flatten() {
-                    if let Some(workflow_run) = node.workflow_run.clone() {
-                        last_suite_per_workflow.insert(workflow_run.workflow.id, node);
-                    }
+        if let Some(suites) = commit.check_suites
+            && let Some(nodes) = suites.nodes
+        {
+            for node in nodes.into_iter().flatten() {
+                if let Some(workflow_run) = node.workflow_run.clone() {
+                    last_suite_per_workflow.insert(workflow_run.workflow.id, node);
                 }
             }
         }
@@ -276,10 +276,10 @@ async fn get_pr_commits(repo: &RepoClient, pr: PrNumber) -> Result<PrWithCommits
                 status = CommitState::Pending;
             }
 
-            if let Some(run) = &suite.workflow_run {
-                if let Some(db_id) = run.database_id {
-                    workflow_run_ids.insert(db_id as u64);
-                }
+            if let Some(run) = &suite.workflow_run
+                && let Some(db_id) = run.database_id
+            {
+                workflow_run_ids.insert(db_id as u64);
             }
         }
 

@@ -184,7 +184,7 @@ fn run_git_discovery(sender: &Sender, base_path: &Path) -> Result<(), GitError> 
 
     // Don't compare branch with itself
     if current_branch == default_branch {
-        eprintln!("Current branch is the same as default branch ({current_branch})");
+        log::warn!("Current branch is the same as default branch ({current_branch})");
         return Ok(());
     }
 
@@ -214,22 +214,22 @@ fn run_git_discovery(sender: &Sender, base_path: &Path) -> Result<(), GitError> 
 
             for file_path in files_to_check.into_iter().flatten() {
                 // Check if this is a PNG file
-                if let Some(extension) = file_path.extension() {
-                    if extension == "png" {
-                        // Create snapshot for this changed PNG file
-                        if let Ok(base_tree) = base_commit.tree() {
-                            if let Ok(Some(snapshot)) = create_git_snapshot(
-                                &repo,
-                                &base_tree,
-                                file_path,
-                                &github_repo_info,
-                                &commit_sha,
-                            ) {
-                                sender.send(Command::Snapshot(snapshot)).ok();
-                            }
-                        }
-                        break; // Only process once per delta
+                if let Some(extension) = file_path.extension()
+                    && extension == "png"
+                {
+                    // Create snapshot for this changed PNG file
+                    if let Ok(base_tree) = base_commit.tree()
+                        && let Ok(Some(snapshot)) = create_git_snapshot(
+                            &repo,
+                            &base_tree,
+                            file_path,
+                            &github_repo_info,
+                            &commit_sha,
+                        )
+                    {
+                        sender.send(Command::Snapshot(snapshot)).ok();
                     }
+                    break; // Only process once per delta
                 }
             }
             true // Continue iteration
@@ -292,10 +292,10 @@ fn create_git_snapshot(
     let head_tree = head_commit.tree()?;
 
     // Compare git object content (both should be LFS pointers if using LFS)
-    if let Ok(current_content) = get_file_from_tree(repo, &head_tree, relative_path) {
-        if default_file_content == current_content {
-            return Ok(None);
-        }
+    if let Ok(current_content) = get_file_from_tree(repo, &head_tree, relative_path)
+        && default_file_content == current_content
+    {
+        return Ok(None);
     }
 
     // Check if this is an LFS pointer file

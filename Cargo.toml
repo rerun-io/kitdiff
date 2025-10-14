@@ -18,48 +18,52 @@ targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
 
 
 [dependencies]
-eframe = { version = "0.32.3", features = ["glow", "default", "persistence", "ron"] }
-egui_extras = { version = "0.32.3", features = ["image", "file", "http"] }
-ehttp = { version = "0.5", features = ["native-async"] }
-dify = "0.7"
-serde = "1"
-serde_json = "1.0"
-image = "0.25.8"
-tempfile = { version = "3.0" }
-zip = { version = "5", default-features = false, features = ["deflate"] }
-flate2 = { version = "1.1" }
-tar = { version = "0.4" }
-chrono = { version = "0.4", features = ["serde"] }
-octocrab = { version = "0.45.0", default-features = false, features = ["stream"] }
-octocrab-wasm = { path = "crates/octocrab-wasm" }
-egui_inbox = { version = "0.9.0", features = ["async", "tokio"] }
-futures = "0.3"
-re_ui = "0.26.0-alpha.1+dev"
-getrandom = { version = "0.3", features = ["wasm_js"] }
-anyhow = "1.0.99"
-graphql_client = "0.14.0"
-thiserror = "1.0.69"
+anyhow = "1.0.100"
 bytes = "1.10.1"
-reqwest = "0.12.23"
-hello_egui_utils = "0.9.0"
-serde_urlencoded = "0.7"
-web-time = "1"
+chrono = { version = "0.4.42", features = ["serde"] }
+dify = "0.7.4"
+eframe = { version = "0.33.0", features = ["glow", "default", "persistence", "ron"] }
+egui_extras = { version = "0.33.0", features = ["image", "file", "http"] }
+egui_inbox = { version = "0.10.0", features = ["async", "tokio"] }
+ehttp = { version = "0.5.0", features = ["native-async"] }
+env_logger = { version = "0.11.8", default-features=false, features = ["auto-color", "humantime"] }
+flate2 = { version = "1.1" }
+futures = "0.3.31"
+getrandom = { version = "0.3", features = ["wasm_js"] }
+graphql_client = "0.14.0"
+hello_egui_utils = "0.10.0"
+image = "0.25.8"
+log = "0.4.28"
+octocrab = { version = "0.47.0", default-features = false, features = ["stream"] }
+octocrab-wasm = { path = "crates/octocrab-wasm" }
+re_ui = { git = "https://github.com/rerun-io/rerun", branch = "main" }
+reqwest = { version = "0.12.23", default-features = false, features = [
+    "rustls-tls",
+] }
+serde = "1.0"
+serde_json = "1.0"
+serde_urlencoded = "0.7.1"
+tar = { version = "0.4.44" }
+tempfile = { version = "3.23" }
+thiserror = "2.0.17"
+web-time = "1.1"
+zip = { version = "6.0.0", default-features = false, features = ["deflate"] }
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 axum = "0.8.6"
+clap = { version = "4.5", features = ["derive"] }
 env_logger = "0.11.8"
+git2 = { version = "0.20.2" }
 ignore = { version = "0.4" }
-clap = { version = "4.0", features = ["derive"] }
-git2 = { version = "0.18" }
-tokio = { version = "1.0", features = ["full"] }
+tokio = { version = "1.47", features = ["full"] }
 
 # web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen-futures = { version = "0.4" }
-wasm-bindgen = { version = "0.2" }
-js-sys = { version = "0.3" }
-web-sys = { version = "0.3", features = ["Window", "Location", "History", "Navigator", "Clipboard", "Performance"] }
+js-sys = { version = "0.3.81" }
+wasm-bindgen = { version = "0.2.104" }
+wasm-bindgen-futures = { version = "0.4.54" }
+web-sys = { version = "0.3.81", features = ["Window", "Location", "History", "Navigator", "Clipboard", "Performance"] }
 
 [profile.release]
 opt-level = 2 # fast and small wasm
@@ -72,12 +76,12 @@ opt-level = 2
 [patch.crates-io]
 
 # If you want to use the bleeding edge version of egui and eframe:
-egui = { git = "https://github.com/emilk/egui", branch = "main" }
-eframe = { git = "https://github.com/emilk/egui", branch = "main" }
-egui_extras = { git = "https://github.com/emilk/egui", branch = "main" }
+# egui = { git = "https://github.com/emilk/egui", branch = "main" }
+# eframe = { git = "https://github.com/emilk/egui", branch = "main" }
+# egui_extras = { git = "https://github.com/emilk/egui", branch = "main" }
 
-re_ui = { git = "https://github.com/rerun-io/rerun", branch = "main" }
-egui_commonmark = { git = "https://github.com/rerun-io/egui_commonmark.git", branch = "lucas/update-egui-main" }
+# re_ui = { git = "https://github.com/rerun-io/rerun", branch = "main" }
+# egui_commonmark = { git = "https://github.com/rerun-io/egui_commonmark.git", branch = "lucas/update-egui-main" }
 
 # If you fork https://github.com/emilk/egui you can test with:
 # egui = { path = "../egui/crates/egui" }
@@ -123,23 +127,28 @@ allow_attributes = "warn"
 as_ptr_cast_mut = "warn"
 await_holding_lock = "warn"
 bool_to_int_with_if = "warn"
+branches_sharing_code = "warn"
 char_lit_as_u8 = "warn"
 checked_conversions = "warn"
 clear_with_drain = "warn"
 cloned_instead_of_copied = "warn"
 dbg_macro = "warn"
 debug_assert_with_mut_call = "warn"
+default_union_representation = "warn"
 derive_partial_eq_without_eq = "warn"
 disallowed_macros = "warn"                  # See clippy.toml
 disallowed_methods = "warn"                 # See clippy.toml
 disallowed_names = "warn"                   # See clippy.toml
 disallowed_script_idents = "warn"           # See clippy.toml
 disallowed_types = "warn"                   # See clippy.toml
+doc_comment_double_space_linebreaks = "warn"
 doc_include_without_cfg = "warn"
 doc_link_with_quotes = "warn"
 doc_markdown = "warn"
+elidable_lifetime_names = "warn"
 empty_enum = "warn"
 empty_enum_variants_with_brackets = "warn"
+empty_line_after_outer_attr = "warn"
 enum_glob_use = "warn"
 equatable_if_let = "warn"
 exit = "warn"
@@ -155,8 +164,12 @@ fn_params_excessive_bools = "warn"
 fn_to_numeric_cast_any = "warn"
 from_iter_instead_of_collect = "warn"
 get_unwrap = "warn"
+if_let_mutex = "warn"
+ignore_without_reason = "warn"
 implicit_clone = "warn"
+implied_bounds_in_impls = "warn"
 imprecise_flops = "warn"
+inconsistent_struct_constructor = "warn"
 index_refutable_slice = "warn"
 inefficient_to_string = "warn"
 infinite_loop = "warn"
@@ -187,6 +200,7 @@ manual_instant_elapsed = "warn"
 manual_is_power_of_two = "warn"
 manual_is_variant_and = "warn"
 manual_let_else = "warn"
+manual_midpoint = "warn" # NOTE `midpoint` is often a lot slower for floats, so we have our own `emath::fast_midpoint` function.
 manual_ok_or = "warn"
 manual_string_new = "warn"
 map_err_ignore = "warn"
@@ -209,12 +223,16 @@ needless_for_each = "warn"
 needless_pass_by_ref_mut = "warn"
 needless_pass_by_value = "warn"
 negative_feature_names = "warn"
+non_std_lazy_statics = "warn"
 non_zero_suggestions = "warn"
 nonstandard_macro_braces = "warn"
 option_as_ref_cloned = "warn"
 option_option = "warn"
 path_buf_push_overwrite = "warn"
 pathbuf_init_then_push = "warn"
+precedence_bits = "warn"
+print_stderr = "warn"
+print_stdout = "warn"
 ptr_as_ptr = "warn"
 ptr_cast_constness = "warn"
 pub_underscore_fields = "warn"
@@ -224,13 +242,16 @@ readonly_write_lock = "warn"
 redundant_type_annotations = "warn"
 ref_as_ptr = "warn"
 ref_option_ref = "warn"
+ref_patterns = "warn"
 rest_pat_in_fully_bound_structs = "warn"
+return_and_then = "warn"
 same_functions_in_if_condition = "warn"
 semicolon_if_nothing_returned = "warn"
 set_contains_or_insert = "warn"
 should_panic_without_expect = "warn"
 single_char_pattern = "warn"
 single_match_else = "warn"
+single_option_map = "warn"
 str_split_at_newline = "warn"
 str_to_string = "warn"
 string_add = "warn"
@@ -245,6 +266,7 @@ too_long_first_doc_paragraph = "warn"
 too_many_lines = "warn"
 trailing_empty_array = "warn"
 trait_duplication_in_bounds = "warn"
+transmute_ptr_to_ptr = "warn"
 tuple_array_conversions = "warn"
 unchecked_duration_subtraction = "warn"
 undocumented_unsafe_blocks = "warn"
@@ -252,8 +274,12 @@ unimplemented = "warn"
 uninhabited_references = "warn"
 uninlined_format_args = "warn"
 unnecessary_box_returns = "warn"
+unnecessary_debug_formatting = "warn"
 unnecessary_literal_bound = "warn"
+unnecessary_safety_comment = "warn"
 unnecessary_safety_doc = "warn"
+unnecessary_self_imports = "warn"
+unnecessary_semicolon = "warn"
 unnecessary_struct_initialization = "warn"
 unnecessary_wraps = "warn"
 unnested_or_patterns = "warn"
@@ -263,11 +289,15 @@ unused_self = "warn"
 unused_trait_names = "warn"
 unwrap_used = "warn"
 use_self = "warn"
+useless_let_if_seq = "warn"
 useless_transmute = "warn"
 verbose_file_reads = "warn"
 wildcard_dependencies = "warn"
 wildcard_imports = "warn"
 zero_sized_map_values = "warn"
+
+# TODO: enable?
+missing_errors_doc = "allow"
 
 manual_range_contains = "allow"       # this is better on 'allow'
 map_unwrap_or = "allow"               # this is better on 'allow'

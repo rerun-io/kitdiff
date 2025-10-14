@@ -34,7 +34,7 @@ impl DiffSource {
         if let Ok(link) = url.parse() {
             Self::Pr(link)
         } else if let Some(link) = parse_github_artifact_url(url) {
-            return Self::GHArtifact(link);
+            Self::GHArtifact(link)
         } else {
             // Try to load it as direct zip/tar.gz URL
             Self::Archive(DataReference::Url(url.to_owned()))
