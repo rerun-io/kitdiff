@@ -258,7 +258,7 @@ impl AppState {
                 if let Page::DiffViewer(viewer) = &mut self.page {
                     viewer.handle(ctx, command);
                 } else {
-                    eprintln!("Received ViewerCommand but not in DiffViewer page"); // TODO: Better logging
+                    log::warn!("Received ViewerCommand but not in DiffViewer page");
                 }
             }
             SystemCommand::Refresh => match &mut self.page {

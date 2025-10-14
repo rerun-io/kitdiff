@@ -239,7 +239,7 @@ impl GitHubAuth {
                     self.sender.send(SystemCommand::Refresh).ok();
                 }
                 AuthEvent::Error(error) => {
-                    eprintln!("Auth error: {error}");
+                    log::error!("Auth error: {error}");
                 }
             }
         }

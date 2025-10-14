@@ -11,7 +11,7 @@ pub fn login_github(ctx: &Context, tx: AuthSender) {
     let ctx = ctx.clone();
     spawn(async move {
         if let Err(err) = login(ctx, tx).await {
-            eprintln!("Error during GitHub login: {err:?}");
+            log::error!("Error during GitHub login: {err:?}");
         }
     });
 }
