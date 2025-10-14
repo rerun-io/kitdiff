@@ -71,9 +71,11 @@ impl GitLoader {
 
 impl LoadSnapshots for GitLoader {
     fn update(&mut self, ctx: &Context) {
-        if let Some(new_data) = self.inbox.read(ctx).last() {
+
+        for new_data in self.inbox.read(ctx) {
             match new_data {
                 Command::Snapshot(snapshot) => {
+                    dbg!(&snapshot);
                     self.snapshots.push(snapshot);
                     sort_snapshots(&mut self.snapshots);
                 }
@@ -235,23 +237,45 @@ fn run_git_discovery(sender: &Sender, base_path: &Path) -> Result<(), GitError> 
                 gix::object::tree::diff::Action,
                 Box<dyn std::error::Error + Send + Sync>,
             > {
-                // Check both old and new file paths (handles renames/moves)
-                let path = change.location();
-                let path_str = path.to_str().unwrap_or("");
+                // Check the file path
+                let file_path = change.location();
+                let path_str = file_path.to_str().unwrap_or("");
                 let path_obj = Path::new(path_str);
 
                 // Check if this is a PNG file
-                if let Some(extension) = path_obj.extension() {
-                    if extension == "png" {
-                        // Create snapshot for this changed PNG file
-                        if let Ok(Some(snapshot)) = create_git_snapshot(
-                            &repo,
-                            &mut base_tree.clone(),
-                            path_obj,
-                            &github_repo_info,
-                            &commit_sha,
-                        ) {
-                            sender.send(Command::Snapshot(snapshot)).ok();
+                if let Some(extension) = path_obj.extension()
+                    && extension == "png"
+                {
+                    // Create snapshot for this changed PNG file
+                    match base_commit.tree() {
+                        Ok(base_tree) => {
+                            match create_git_snapshot(
+                                &repo,
+                                &base_tree,
+                                path_obj,
+                                &github_repo_info,
+                                &commit_sha,
+                            ) {
+                                Ok(Some(snapshot)) => {
+                                    println!("Created snapshot for {}", path_obj.display());
+                                    sender.send(Command::Snapshot(snapshot)).ok();
+                                }
+                                Ok(None) => {
+                                    dbg!("No snapshot created");
+                                    log::info!("No snapshot created for {}", path_obj.display());
+                                }
+                                Err(err) => {
+                                    dbg!(&err);
+                                    log::error!(
+                                        "Failed to create snapshot for {}: {}",
+                                        path_obj.display(),
+                                        err
+                                    );
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            log::error!("Failed to get base tree: {}", err);
                         }
                     }
                 }
@@ -292,7 +316,7 @@ fn find_default_branch(repo: &Repository) -> Result<String, GitError> {
 
 fn create_git_snapshot(
     repo: &Repository,
-    default_tree: &mut gix::Tree<'_>,
+    default_tree: &gix::Tree<'_>,
     relative_path: &Path,
     github_repo_info: &Option<(String, String)>,
     commit_sha: &str,
@@ -326,10 +350,10 @@ fn create_git_snapshot(
     let head_commit = head_commit_obj
         .try_into_commit()
         .map_err(|_| GitError::BranchNotFound)?;
-    let mut head_tree = head_commit.tree().map_err(|e| GitError::Gix(Box::new(e)))?;
+    let head_tree = head_commit.tree().map_err(|e| GitError::Gix(Box::new(e)))?;
 
     // Compare git object content (both should be LFS pointers if using LFS)
-    if let Ok(current_content) = get_file_from_tree(repo, &mut head_tree, relative_path)
+    if let Ok(current_content) = get_file_from_tree(repo, &head_tree, relative_path)
         && default_file_content == current_content
     {
         return Ok(None);
@@ -366,10 +390,11 @@ fn create_git_snapshot(
 
 fn get_file_from_tree(
     repo: &Repository,
-    tree: &mut gix::Tree<'_>,
+    tree: &gix::Tree<'_>,
     path: &Path,
 ) -> Result<Vec<u8>, GitError> {
-    let entry = tree
+    let mut tree_clone = tree.clone();
+    let entry = tree_clone
         .peel_to_entry_by_path(path)
         .map_err(|e| GitError::Gix(Box::new(e)))?
         .ok_or(GitError::FileNotFound)?;
