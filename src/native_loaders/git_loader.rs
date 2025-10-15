@@ -255,6 +255,7 @@ fn run_git_discovery(sender: &Sender, base_path: &Path) -> Result<(), GitError> 
                                 path_obj,
                                 &github_repo_info,
                                 &commit_sha,
+                                base_path,
                             ) {
                                 Ok(Some(snapshot)) => {
                                     println!("Created snapshot for {}", path_obj.display());
@@ -320,6 +321,7 @@ fn create_git_snapshot(
     relative_path: &Path,
     github_repo_info: &Option<(String, String)>,
     commit_sha: &str,
+    base_path: &Path,
 ) -> Result<Option<Snapshot>, GitError> {
     // Skip files that are variants
     let file_name = relative_path
@@ -380,10 +382,12 @@ fn create_git_snapshot(
         }
     };
 
+    let full_path = base_path.join(relative_path);
+
     Ok(Some(Snapshot {
         path: relative_path.to_path_buf(),
         old: Some(FileReference::Source(default_image_source)), // Default branch version as ImageSource
-        new: Some(FileReference::Path(relative_path.to_path_buf())), // Current working tree version
+        new: Some(FileReference::Path(full_path)), // Current working tree version with full path
         diff: None,                                             // Always None for git mode
     }))
 }
