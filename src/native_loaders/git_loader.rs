@@ -4,17 +4,16 @@ use eframe::egui::load::Bytes;
 use eframe::egui::{Context, ImageSource};
 use egui_inbox::{UiInbox, UiInboxSender};
 use gix::Repository;
-use gix::bstr::ByteSlice;
+use gix::bstr::ByteSlice as _;
 use octocrab::Octocrab;
 use std::borrow::Cow;
-use std::fmt::Display;
 use std::path::{Path, PathBuf};
 use std::str;
 use std::task::Poll;
 
 enum Command {
     Snapshot(Snapshot),
-    Error(GitError),
+    Error(anyhow::Error),
     Done,
     GitInfo(GitInfo),
 }
@@ -75,12 +74,11 @@ impl LoadSnapshots for GitLoader {
         for new_data in self.inbox.read(ctx) {
             match new_data {
                 Command::Snapshot(snapshot) => {
-                    dbg!(&snapshot);
                     self.snapshots.push(snapshot);
                     sort_snapshots(&mut self.snapshots);
                 }
                 Command::Error(e) => {
-                    self.state = Poll::Ready(Err(e.into()));
+                    self.state = Poll::Ready(Err(e));
                 }
                 Command::GitInfo(info) => {
                     self.git_info = Some(info);
@@ -119,45 +117,13 @@ impl LoadSnapshots for GitLoader {
     }
 }
 
-#[derive(Debug)]
-pub enum GitError {
-    RepoNotFound,
-    BranchNotFound,
-    FileNotFound,
-    Gix(Box<dyn std::error::Error + Send + Sync>),
-    IoError(std::io::Error),
-    PrUrlParseError,
-    NetworkError(String),
-}
 
-impl Display for GitError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::RepoNotFound => write!(f, "Git repository not found"),
-            Self::BranchNotFound => write!(f, "Default branch not found"),
-            Self::FileNotFound => write!(f, "File not found in git tree"),
-            Self::Gix(err) => write!(f, "Git error: {err}"),
-            Self::IoError(err) => write!(f, "IO error: {err}"),
-            Self::PrUrlParseError => write!(f, "Failed to parse PR URL"),
-            Self::NetworkError(msg) => write!(f, "Network error: {msg}"),
-        }
-    }
-}
-
-impl std::error::Error for GitError {}
-
-impl From<std::io::Error> for GitError {
-    fn from(err: std::io::Error) -> Self {
-        Self::IoError(err)
-    }
-}
-
-fn run_git_discovery(sender: &Sender, base_path: &Path) -> Result<(), GitError> {
+fn run_git_discovery(sender: &Sender, base_path: &Path) -> anyhow::Result<()> {
     // Open git repository in current directory
-    let repo = gix::open(base_path).map_err(|_err| GitError::RepoNotFound)?;
+    let repo = gix::open(base_path).map_err(|e| anyhow::anyhow!("Git repository not found: {}", e))?;
 
     // Get current branch
-    let head = repo.head().map_err(|e| GitError::Gix(Box::new(e)))?;
+    let head = repo.head()?;
     let current_branch = head
         .referent_name()
         .and_then(|n| n.shorten().as_bstr().to_str().ok())
@@ -190,29 +156,19 @@ fn run_git_discovery(sender: &Sender, base_path: &Path) -> Result<(), GitError> 
     }
 
     // Get the merge base between current branch and default branch
-    let head_ref = repo.head().map_err(|e| GitError::Gix(Box::new(e)))?;
-    let head_commit_id = head_ref
-        .into_peeled_id()
-        .map_err(|e| GitError::Gix(Box::new(e)))?;
-    let head_commit_obj = repo
-        .find_object(head_commit_id.detach())
-        .map_err(|e| GitError::Gix(Box::new(e)))?;
+    let head_ref = repo.head()?;
+    let head_commit_id = head_ref.into_peeled_id()?;
+    let head_commit_obj = repo.find_object(head_commit_id.detach())?;
     let head_commit = head_commit_obj
         .try_into_commit()
-        .map_err(|_| GitError::BranchNotFound)?;
+        .map_err(|_| anyhow::anyhow!("Failed to get commit from HEAD"))?;
 
-    let default_ref = repo
-        .find_reference(&format!("refs/heads/{}", default_branch))
-        .map_err(|e| GitError::Gix(Box::new(e)))?;
-    let default_commit_id = default_ref
-        .into_fully_peeled_id()
-        .map_err(|e| GitError::Gix(Box::new(e)))?;
-    let default_commit_obj = repo
-        .find_object(default_commit_id.detach())
-        .map_err(|e| GitError::Gix(Box::new(e)))?;
+    let default_ref = repo.find_reference(&format!("refs/heads/{default_branch}"))?;
+    let default_commit_id = default_ref.into_fully_peeled_id()?;
+    let default_commit_obj = repo.find_object(default_commit_id.detach())?;
     let default_commit = default_commit_obj
         .try_into_commit()
-        .map_err(|_| GitError::BranchNotFound)?;
+        .map_err(|_| anyhow::anyhow!("Failed to get commit from default branch"))?;
 
     // Find merge base - for now, just use the default branch commit as the base
     // This is a simplification but will work for the common case
@@ -223,14 +179,12 @@ fn run_git_discovery(sender: &Sender, base_path: &Path) -> Result<(), GitError> 
     let commit_sha = base_commit.id.to_string();
 
     // Get current HEAD tree for comparison
-    let head_tree = head_commit.tree().map_err(|e| GitError::Gix(Box::new(e)))?;
+    let head_tree = head_commit.tree()?;
 
-    let base_tree = base_commit.tree().map_err(|e| GitError::Gix(Box::new(e)))?;
+    let base_tree = base_commit.tree()?;
 
     // Use gix diff to find changed PNG files between merge base and current HEAD
-    base_tree
-        .changes()
-        .map_err(|e| GitError::Gix(Box::new(e)))?
+    base_tree.changes()?
         .for_each_to_obtain_tree(
             &head_tree,
             |change: gix::object::tree::diff::Change<'_, '_, '_>| -> Result<
@@ -258,41 +212,33 @@ fn run_git_discovery(sender: &Sender, base_path: &Path) -> Result<(), GitError> 
                                 base_path,
                             ) {
                                 Ok(Some(snapshot)) => {
-                                    println!("Created snapshot for {}", path_obj.display());
                                     sender.send(Command::Snapshot(snapshot)).ok();
                                 }
                                 Ok(None) => {
-                                    dbg!("No snapshot created");
                                     log::info!("No snapshot created for {}", path_obj.display());
                                 }
                                 Err(err) => {
-                                    dbg!(&err);
-                                    log::error!(
-                                        "Failed to create snapshot for {}: {}",
-                                        path_obj.display(),
-                                        err
-                                    );
+                                    log::error!("Failed to create snapshot for {}: {err}", path_obj.display());
                                 }
                             }
                         }
                         Err(err) => {
-                            log::error!("Failed to get base tree: {}", err);
+                            log::error!("Failed to get base tree: {err}");
                         }
                     }
                 }
                 Ok(gix::object::tree::diff::Action::Continue)
             },
-        )
-        .map_err(|e| GitError::Gix(Box::new(e)))?;
+        )?;
 
     Ok(())
 }
 
-fn find_default_branch(repo: &Repository) -> Result<String, GitError> {
+fn find_default_branch(repo: &Repository) -> anyhow::Result<String> {
     // Try common default branch names
     for branch_name in ["main", "master"] {
         if repo
-            .find_reference(&format!("refs/heads/{}", branch_name))
+            .find_reference(&format!("refs/heads/{branch_name}"))
             .is_ok()
         {
             return Ok(branch_name.to_owned());
@@ -300,19 +246,15 @@ fn find_default_branch(repo: &Repository) -> Result<String, GitError> {
     }
 
     // Fall back to first branch found
-    let references = repo.references().map_err(|e| GitError::Gix(Box::new(e)))?;
+    let references = repo.references()?;
 
-    for reference in (references
-        .prefixed("refs/heads/")
-        .map_err(|e| GitError::Gix(Box::new(e)))?)
-    .flatten()
-    {
+    for reference in references.prefixed("refs/heads/")?.flatten() {
         if let Ok(name) = reference.name().shorten().to_str() {
             return Ok(name.to_owned());
         }
     }
 
-    Err(GitError::BranchNotFound)
+    anyhow::bail!("No default branch found")
 }
 
 fn create_git_snapshot(
@@ -322,12 +264,12 @@ fn create_git_snapshot(
     github_repo_info: &Option<(String, String)>,
     commit_sha: &str,
     base_path: &Path,
-) -> Result<Option<Snapshot>, GitError> {
+) -> anyhow::Result<Option<Snapshot>> {
     // Skip files that are variants
     let file_name = relative_path
         .file_name()
         .and_then(|n| n.to_str())
-        .ok_or(GitError::FileNotFound)?;
+        .ok_or_else(|| anyhow::anyhow!("Invalid file path"))?;
 
     if file_name.ends_with(".old.png")
         || file_name.ends_with(".new.png")
@@ -342,17 +284,13 @@ fn create_git_snapshot(
     };
 
     // Get the current file from the current branch's tree to compare git objects properly
-    let head_ref = repo.head().map_err(|e| GitError::Gix(Box::new(e)))?;
-    let head_commit_id = head_ref
-        .into_peeled_id()
-        .map_err(|e| GitError::Gix(Box::new(e)))?;
-    let head_commit_obj = repo
-        .find_object(head_commit_id.detach())
-        .map_err(|e| GitError::Gix(Box::new(e)))?;
+    let head_ref = repo.head()?;
+    let head_commit_id = head_ref.into_peeled_id()?;
+    let head_commit_obj = repo.find_object(head_commit_id.detach())?;
     let head_commit = head_commit_obj
         .try_into_commit()
-        .map_err(|_| GitError::BranchNotFound)?;
-    let head_tree = head_commit.tree().map_err(|e| GitError::Gix(Box::new(e)))?;
+        .map_err(|_| anyhow::anyhow!("Failed to get commit from HEAD"))?;
+    let head_tree = head_commit.tree()?;
 
     // Compare git object content (both should be LFS pointers if using LFS)
     if let Ok(current_content) = get_file_from_tree(repo, &head_tree, relative_path)
@@ -396,21 +334,20 @@ fn get_file_from_tree(
     repo: &Repository,
     tree: &gix::Tree<'_>,
     path: &Path,
-) -> Result<Vec<u8>, GitError> {
+) -> anyhow::Result<Vec<u8>> {
     let mut tree_clone = tree.clone();
     let entry = tree_clone
-        .peel_to_entry_by_path(path)
-        .map_err(|e| GitError::Gix(Box::new(e)))?
-        .ok_or(GitError::FileNotFound)?;
+        .peel_to_entry_by_path(path)?
+        .ok_or_else(|| anyhow::anyhow!("File not found in tree"))?;
 
     if entry.mode().is_blob() {
-        let object = repo
-            .find_object(entry.oid())
-            .map_err(|e| GitError::Gix(Box::new(e)))?;
-        let blob = object.try_into_blob().map_err(|_| GitError::FileNotFound)?;
-        Ok(blob.data.to_vec())
+        let object = repo.find_object(entry.oid())?;
+        let blob = object
+            .try_into_blob()
+            .map_err(|_| anyhow::anyhow!("Entry is not a blob"))?;
+        Ok(blob.data.clone())
     } else {
-        Err(GitError::FileNotFound)
+        anyhow::bail!("Path is not a file")
     }
 }
 
