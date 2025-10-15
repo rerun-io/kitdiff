@@ -18,7 +18,7 @@ pub enum Commands {
     Files { directory: Option<String> },
     /// Compare images between current branch and default branch
     Git { repo_path: Option<String> },
-    /// Compare images between PR branches from GitHub PR URL (needs to be run from within the repo)
+    /// Compare images between PR branches from GitHub PR URL
     Pr { url: String },
     /// Load and compare snapshot files from a zip archive (URL or local file)
     Archive { source: String },

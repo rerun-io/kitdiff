@@ -1,6 +1,6 @@
-use crate::diff_image_loader;
 use crate::diff_image_loader::DiffOptions;
 use crate::state::{AppStateRef, PageRef};
+use crate::{diff_image_loader, state::View};
 use eframe::egui;
 use eframe::egui::{Color32, ImageSource};
 use std::path::PathBuf;
@@ -88,14 +88,14 @@ impl Snapshot {
         state: &AppStateRef<'a>,
         uri: String,
         opacity: f32,
-        show_all: bool,
+        blend_all: bool,
     ) -> eframe::egui::Image<'a> {
         let mut image = eframe::egui::Image::new(uri)
             .texture_options(eframe::egui::TextureOptions {
                 magnification: state.settings.texture_magnification,
                 ..eframe::egui::TextureOptions::default()
             })
-            .tint(Color32::from_white_alpha(if show_all {
+            .tint(Color32::from_white_alpha(if blend_all {
                 (255.0 * opacity) as u8
             } else {
                 u8::MAX
@@ -114,37 +114,37 @@ impl Snapshot {
         let PageRef::DiffViewer(vs) = &state.page else {
             return None;
         };
-        let show_all = vs.view_filter.all();
-        let show_old = vs.view_filter.show_old;
-        (show_all || show_old)
+        let blend_all = vs.view == View::BlendAll;
+        let show_old = vs.view == View::Old;
+        (blend_all || show_old)
             .then(|| self.old_uri())
             .flatten()
-            .map(|uri| Self::make_image(state, uri, 1.0, show_all))
+            .map(|uri| Self::make_image(state, uri, 1.0, blend_all))
     }
 
     pub fn new_image<'a>(&self, state: &AppStateRef<'a>) -> Option<eframe::egui::Image<'a>> {
         let PageRef::DiffViewer(vs) = &state.page else {
             return None;
         };
-        let show_all = vs.view_filter.all();
-        let show_new = vs.view_filter.show_new;
-        (show_all || show_new)
+        let blend_all = vs.view == View::BlendAll;
+        let show_new = vs.view == View::New;
+        (blend_all || show_new)
             .then(|| self.new_uri())
             .flatten()
-            .map(|new_uri| Self::make_image(state, new_uri, state.settings.new_opacity, show_all))
+            .map(|new_uri| Self::make_image(state, new_uri, state.settings.new_opacity, blend_all))
     }
 
     pub fn diff_image<'a>(&self, state: &AppStateRef<'a>) -> Option<eframe::egui::Image<'a>> {
         let PageRef::DiffViewer(vs) = &state.page else {
             return None;
         };
-        let show_all = vs.view_filter.all();
-        let show_diff = vs.view_filter.show_diff;
-        (show_all || show_diff)
+        let blend_all = vs.view == View::BlendAll;
+        let show_diff = vs.view == View::Diff;
+        (blend_all || show_diff)
             .then(|| self.diff_uri(state.settings.use_original_diff, state.settings.options))
             .flatten()
             .map(|diff_uri| {
-                Self::make_image(state, diff_uri, state.settings.diff_opacity, show_all)
+                Self::make_image(state, diff_uri, state.settings.diff_opacity, blend_all)
             })
     }
 }
