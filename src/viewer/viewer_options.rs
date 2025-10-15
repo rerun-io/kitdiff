@@ -1,12 +1,12 @@
 use crate::state::{SystemCommand, ViewerAppStateRef, ViewerSystemCommand};
 use crate::{settings::ImageMode, state::View};
-use eframe::egui::{Slider, TextureFilter, Ui};
+use eframe::egui::{self, Slider, TextureFilter, Ui};
 
 pub fn viewer_options(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
     let mut settings = state.app.settings.clone();
 
     ui.group(|ui| {
-        ui.strong("View only");
+        ui.strong("View");
         let mut new_view = state.view;
 
         for view in View::ALL {
@@ -15,6 +15,15 @@ pub fn viewer_options(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
                 view,
                 format!("{view} ({})", view.key().name()),
             );
+        }
+
+        ui.label("Toggle old/new with SPACE");
+        if ui.input_mut(|i| i.consume_key(egui::Modifiers::default(), egui::Key::Space)) {
+            if new_view == View::Old {
+                new_view = View::New;
+            } else {
+                new_view = View::Old;
+            }
         }
 
         if new_view != state.view {
