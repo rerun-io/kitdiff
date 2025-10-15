@@ -18,13 +18,13 @@ pub fn viewer_options(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
         }
 
         ui.label("Toggle old/new with SPACE");
-        if ui.input_mut(|i| i.consume_key(egui::Modifiers::default(), egui::Key::Space)) {
-            if new_view == View::Old {
+        ui.input(|i| {
+            if i.key_pressed(egui::Key::Space) {
                 new_view = View::New;
-            } else {
+            } else if i.key_released(egui::Key::Space) {
                 new_view = View::Old;
             }
-        }
+        });
 
         if new_view != state.view {
             state.app.send(ViewerSystemCommand::SetView(new_view));
