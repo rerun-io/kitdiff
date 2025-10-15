@@ -120,7 +120,7 @@ impl LoadSnapshots for GitLoader {
 
 fn run_git_discovery(sender: &Sender, base_path: &Path) -> anyhow::Result<()> {
     // Open git repository in current directory
-    let repo = gix::open(base_path).map_err(|e| anyhow::anyhow!("Git repository not found: {}", e))?;
+    let repo = gix::open(base_path).map_err(|e| anyhow::anyhow!("Git repository not found: {e}"))?;
 
     // Get current branch
     let head = repo.head()?;
@@ -161,14 +161,14 @@ fn run_git_discovery(sender: &Sender, base_path: &Path) -> anyhow::Result<()> {
     let head_commit_obj = repo.find_object(head_commit_id.detach())?;
     let head_commit = head_commit_obj
         .try_into_commit()
-        .map_err(|_| anyhow::anyhow!("Failed to get commit from HEAD"))?;
+        .map_err(|e| anyhow::anyhow!("Failed to get commit from HEAD: {e:?}"))?;
 
     let default_ref = repo.find_reference(&format!("refs/heads/{default_branch}"))?;
     let default_commit_id = default_ref.into_fully_peeled_id()?;
     let default_commit_obj = repo.find_object(default_commit_id.detach())?;
     let default_commit = default_commit_obj
         .try_into_commit()
-        .map_err(|_| anyhow::anyhow!("Failed to get commit from default branch"))?;
+        .map_err(|e| anyhow::anyhow!("Failed to get commit from default branch: {e:?}"))?;
 
     // Find merge base - for now, just use the default branch commit as the base
     // This is a simplification but will work for the common case
@@ -289,7 +289,7 @@ fn create_git_snapshot(
     let head_commit_obj = repo.find_object(head_commit_id.detach())?;
     let head_commit = head_commit_obj
         .try_into_commit()
-        .map_err(|_| anyhow::anyhow!("Failed to get commit from HEAD"))?;
+        .map_err(|e| anyhow::anyhow!("Failed to get commit from HEAD: {e:?}"))?;
     let head_tree = head_commit.tree()?;
 
     // Compare git object content (both should be LFS pointers if using LFS)
@@ -344,7 +344,7 @@ fn get_file_from_tree(
         let object = repo.find_object(entry.oid())?;
         let blob = object
             .try_into_blob()
-            .map_err(|_| anyhow::anyhow!("Entry is not a blob"))?;
+            .map_err(|e| anyhow::anyhow!("Entry is not a blob: {e:?}"))?;
         Ok(blob.data.clone())
     } else {
         anyhow::bail!("Path is not a file")
