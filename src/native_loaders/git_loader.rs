@@ -70,7 +70,6 @@ impl GitLoader {
 
 impl LoadSnapshots for GitLoader {
     fn update(&mut self, ctx: &Context) {
-
         for new_data in self.inbox.read(ctx) {
             match new_data {
                 Command::Snapshot(snapshot) => {
@@ -117,10 +116,10 @@ impl LoadSnapshots for GitLoader {
     }
 }
 
-
 fn run_git_discovery(sender: &Sender, base_path: &Path) -> anyhow::Result<()> {
     // Open git repository in current directory
-    let repo = gix::open(base_path).map_err(|e| anyhow::anyhow!("Git repository not found: {e}"))?;
+    let repo =
+        gix::open(base_path).map_err(|e| anyhow::anyhow!("Git repository not found: {e}"))?;
 
     // Get current branch
     let head = repo.head()?;
@@ -326,7 +325,7 @@ fn create_git_snapshot(
         path: relative_path.to_path_buf(),
         old: Some(FileReference::Source(default_image_source)), // Default branch version as ImageSource
         new: Some(FileReference::Path(full_path)), // Current working tree version with full path
-        diff: None,                                             // Always None for git mode
+        diff: None,                                // Always None for git mode
     }))
 }
 
