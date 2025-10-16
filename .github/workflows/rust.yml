@@ -146,4 +146,4 @@ jobs:
       with:
         use-cross: true
         command: build
-        args: --verbose --release --target=${{ matrix.TARGET }}
+        args: --release --target=${{ matrix.TARGET }}
