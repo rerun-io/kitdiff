@@ -14,7 +14,7 @@ use std::task::Poll;
 
 enum PipelineState {
     Loading,
-    Triggered,
+    Triggered { workflow_link: String },
     Error(anyhow::Error),
 }
 
@@ -147,13 +147,14 @@ impl LoadSnapshots for GHArtifactLoader {
                     .send(Event::PipelineState(PipelineState::Loading))
                     .ok();
                 hello_egui_utils::spawn(async move {
+                    let workflow_name = "update_kittest_snapshots.yml";
                     let result = client
                         .actions()
                         .create_workflow_dispatch(
-                            artifact.repo.owner,
-                            artifact.repo.repo,
-                            "update_kittest_snapshots.yml",
-                            git_ref,
+                            artifact.repo.owner.clone(),
+                            artifact.repo.repo.clone(),
+                            workflow_name,
+                            git_ref.clone(),
                         )
                         .inputs(json!({
                             "run_id": run_id.to_string(),
@@ -161,10 +162,17 @@ impl LoadSnapshots for GHArtifactLoader {
                         .send()
                         .await;
 
+                    let workflow_link = format!(
+                        "https://github.com/{}/{}/actions/workflows/{workflow_name}",
+                        artifact.repo.owner, artifact.repo.repo
+                    );
+
                     match result {
                         Ok(()) => {
                             sender
-                                .send(Event::PipelineState(PipelineState::Triggered))
+                                .send(Event::PipelineState(PipelineState::Triggered {
+                                    workflow_link,
+                                }))
                                 .ok();
                         }
                         Err(err) => {
@@ -180,8 +188,11 @@ impl LoadSnapshots for GHArtifactLoader {
                 Some(PipelineState::Loading) => {
                     ui.label("Triggering pipeline...");
                 }
-                Some(PipelineState::Triggered) => {
-                    ui.label("Pipeline triggered! Check the PR workflows for progress.");
+                Some(PipelineState::Triggered { workflow_link }) => {
+                    ui.horizontal(|ui| {
+                        ui.label("Pipeline triggered!");
+                        ui.hyperlink_to("View workflows", workflow_link);
+                    });
                 }
                 Some(PipelineState::Error(err)) => {
                     ui.colored_label(ui.visuals().error_fg_color, format!("Error: {err}"));
