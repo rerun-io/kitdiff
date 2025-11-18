@@ -1,6 +1,5 @@
 use crate::github::octokit::RepoClient;
 use crate::state::{AppStateRef, SystemCommand};
-// Import octocrab models
 use crate::DiffSource;
 use eframe::egui;
 use eframe::egui::{Context, Popup, ScrollArea, Spinner};
@@ -16,14 +15,11 @@ use re_ui::{SectionCollapsingHeader, UiExt as _, icons};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::task::Poll;
-// use chrono::DateTime;
 pub type GitObjectID = String;
 pub type DateTime = String;
 #[expect(clippy::upper_case_acronyms)]
 pub type URI = String;
 
-// The paths are relative to the directory where your `Cargo.toml` is located.
-// Both json and the GraphQL schema language are supported as sources for the schema
 #[derive(GraphQLQuery, Debug)]
 #[graphql(
     schema_path = "github.graphql",
