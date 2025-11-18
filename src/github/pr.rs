@@ -1,29 +1,25 @@
 use crate::DiffSource;
+use crate::github::octokit::RepoClient;
+use crate::state::{AppStateRef, SystemCommand};
 use eframe::egui;
-use eframe::egui::{Button, Context, ScrollArea, Spinner};
+use eframe::egui::{Context, Popup, ScrollArea, Spinner};
 use egui_inbox::UiInbox;
 use futures::TryStreamExt as _;
 use futures::stream::FuturesUnordered;
 use graphql_client::GraphQLQuery;
 use octocrab::Octocrab;
+use octocrab::models::{RunId, workflows::WorkflowListArtifact};
 use re_ui::egui_ext::boxed_widget::BoxedWidgetLocalExt as _;
+use re_ui::list_item::{LabelContent, ListItemContentButtonsExt as _, list_item_scope};
+use re_ui::{SectionCollapsingHeader, UiExt as _, icons};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::task::Poll;
-// Import octocrab models
-use crate::github::octokit::RepoClient;
-use crate::state::{AppStateRef, SystemCommand};
-use octocrab::models::{RunId, workflows::WorkflowListArtifact};
-use re_ui::list_item::{LabelContent, ListItemContentButtonsExt as _, list_item_scope};
-use re_ui::{OnResponseExt as _, SectionCollapsingHeader, UiExt as _, icons};
-// use chrono::DateTime;
 pub type GitObjectID = String;
 pub type DateTime = String;
 #[expect(clippy::upper_case_acronyms)]
 pub type URI = String;
 
-// The paths are relative to the directory where your `Cargo.toml` is located.
-// Both json and the GraphQL schema language are supported as sources for the schema
 #[derive(GraphQLQuery, Debug)]
 #[graphql(
     schema_path = "github.graphql",
@@ -33,6 +29,8 @@ pub type URI = String;
 pub struct PrDetailsQuery;
 use crate::github::model::{GithubArtifactLink, GithubPrLink, PrNumber};
 use anyhow::{Error, Result, anyhow};
+use eframe::emath::RectAlign;
+use re_ui::menu::menu_style;
 
 pub fn parse_github_pr_url(url: &str) -> Result<(String, String, u32), String> {
     // Parse URLs like: https://github.com/rerun-io/rerun/pull/11253
@@ -162,27 +160,22 @@ impl GithubPr {
                             Entry::Occupied(_) => {}
                             Entry::Vacant(entry) => {
                                 entry.insert(Poll::Pending);
-
-                                let workflow_run_ids = pr_data
-                                    .commits
-                                    .iter()
-                                    .find(|c| c.sha == sha)
-                                    .map(|c| c.workflow_run_ids.clone())
-                                    .unwrap_or_default();
-
-                                let client =
-                                    RepoClient::new(self.client.clone(), self.link.repo.clone());
-                                self.inbox.spawn(move |tx| async move {
-                                    let artifacts =
-                                        fetch_commit_artifacts(&client, workflow_run_ids).await;
-                                    tx.send(GithubPrCommand::FetchedCommitArtifacts {
-                                        sha,
-                                        artifacts,
-                                    })
-                                    .ok();
-                                });
                             }
                         }
+
+                        let workflow_run_ids = pr_data
+                            .commits
+                            .iter()
+                            .find(|c| c.sha == sha)
+                            .map(|c| c.workflow_run_ids.clone())
+                            .unwrap_or_default();
+
+                        let client = RepoClient::new(self.client.clone(), self.link.repo.clone());
+                        self.inbox.spawn(move |tx| async move {
+                            let artifacts = fetch_commit_artifacts(&client, workflow_run_ids).await;
+                            tx.send(GithubPrCommand::FetchedCommitArtifacts { sha, artifacts })
+                                .ok();
+                        });
                     }
                 }
             }
@@ -335,67 +328,72 @@ pub fn pr_ui(ui: &mut egui::Ui, state: &AppStateRef<'_>, pr: &GithubPr) {
                         let item = ui.list_item();
 
                         let button = match &commit.status {
-                            CommitState::Failure => Button::image(
-                                icons::ERROR.as_image().tint(ui.tokens().alert_error.icon),
-                            )
-                            .boxed_local(),
+                            CommitState::Failure => icons::ERROR
+                                .as_image()
+                                .tint(ui.tokens().alert_error.icon)
+                                .boxed_local(),
                             CommitState::Pending => Spinner::new().boxed_local(),
-                            CommitState::Success => Button::image(
-                                icons::SUCCESS
-                                    .as_image()
-                                    .tint(ui.tokens().alert_success.icon),
-                            )
-                            .boxed_local(),
+                            CommitState::Success => icons::SUCCESS
+                                .as_image()
+                                .tint(ui.tokens().alert_success.icon)
+                                .boxed_local(),
                         };
-
-                        let button = button.on_menu(|ui| {
-                            ui.set_min_width(250.0);
-                            match data.artifacts.get(&commit.sha) {
-                                None => {
-                                    pr.inbox
-                                        .sender()
-                                        .send(GithubPrCommand::FetchCommitArtifacts {
-                                            sha: commit.sha.clone(),
-                                        })
-                                        .ok();
-                                }
-                                Some(Poll::Pending) => {
-                                    ui.spinner();
-                                }
-                                Some(Poll::Ready(Err(error))) => {
-                                    ui.colored_label(
-                                        ui.visuals().error_fg_color,
-                                        format!("Error: {error}"),
-                                    );
-                                }
-                                #[expect(clippy::excessive_nesting)]
-                                Some(Poll::Ready(Ok(artifacts))) => {
-                                    if artifacts.is_empty() {
-                                        ui.label("No artifacts found");
-                                    } else {
-                                        for artifact in artifacts {
-                                            if ui.button(&artifact.data.name).clicked() {
-                                                selected_source = Some(DiffSource::GHArtifact(
-                                                    GithubArtifactLink {
-                                                        repo: pr.link.repo.clone(),
-                                                        artifact_id: artifact.data.id,
-                                                        name: Some(artifact.data.name.clone()),
-                                                        branch_name: Some(data.head_branch.clone()),
-                                                        run_id: Some(artifact.run_id),
-                                                    },
-                                                ));
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        });
 
                         let content = LabelContent::new(&commit.message)
                             .with_button(button)
                             .with_always_show_buttons(true);
 
-                        item.show_hierarchical(ui, content);
+                        let response = item.show_hierarchical(ui, content);
+                        if response.clicked() {
+                            pr.inbox
+                                .sender()
+                                .send(GithubPrCommand::FetchCommitArtifacts {
+                                    sha: commit.sha.clone(),
+                                })
+                                .ok();
+                        }
+                        Popup::menu(&response)
+                            .align(RectAlign::BOTTOM_END)
+                            .style(menu_style())
+                            .show(|ui| {
+                                ui.set_min_width(250.0);
+                                match data.artifacts.get(&commit.sha) {
+                                    None => {
+                                        // Loading should be triggered by the click handler above
+                                    }
+                                    Some(Poll::Pending) => {
+                                        ui.spinner();
+                                    }
+                                    Some(Poll::Ready(Err(error))) => {
+                                        ui.colored_label(
+                                            ui.visuals().error_fg_color,
+                                            format!("Error: {error}"),
+                                        );
+                                    }
+                                    #[expect(clippy::excessive_nesting)]
+                                    Some(Poll::Ready(Ok(artifacts))) => {
+                                        if artifacts.is_empty() {
+                                            ui.label("No artifacts found");
+                                        } else {
+                                            for artifact in artifacts {
+                                                if ui.button(&artifact.data.name).clicked() {
+                                                    selected_source = Some(DiffSource::GHArtifact(
+                                                        GithubArtifactLink {
+                                                            repo: pr.link.repo.clone(),
+                                                            artifact_id: artifact.data.id,
+                                                            name: Some(artifact.data.name.clone()),
+                                                            branch_name: Some(
+                                                                data.head_branch.clone(),
+                                                            ),
+                                                            run_id: Some(artifact.run_id),
+                                                        },
+                                                    ));
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
                     }
                 });
             });
