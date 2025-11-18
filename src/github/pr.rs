@@ -1,6 +1,6 @@
+use crate::DiffSource;
 use crate::github::octokit::RepoClient;
 use crate::state::{AppStateRef, SystemCommand};
-use crate::DiffSource;
 use eframe::egui;
 use eframe::egui::{Context, Popup, ScrollArea, Spinner};
 use egui_inbox::UiInbox;
