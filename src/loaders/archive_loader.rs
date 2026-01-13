@@ -195,12 +195,29 @@ fn get_snapshots(files: &HashMap<PathBuf, Vec<u8>>) -> Vec<Snapshot> {
 fn try_create_snapshot(png_path: &Path, files: &HashMap<PathBuf, Vec<u8>>) -> Option<Snapshot> {
     let file_name = png_path.file_name()?.to_str()?;
 
-    // Skip files that are already variants (.old.png, .new.png, .diff.png)
-    if file_name.ends_with(".old.png")
-        || file_name.ends_with(".new.png")
-        || file_name.ends_with(".diff.png")
-    {
+    // Skip .old.png and .diff.png files - they are only used as variants
+    if file_name.ends_with(".old.png") || file_name.ends_with(".diff.png") {
         return None;
+    }
+
+    // Handle .new.png files that don't have a corresponding base file
+    if file_name.ends_with(".new.png") {
+        let base_path = get_base_path_from_variant(png_path)?;
+        // If the base file exists, this .new.png will be handled when processing the base file
+        if files.contains_key(&base_path) {
+            return None;
+        }
+        // No base file exists - this is a newly added snapshot
+        let new_data = files.get(png_path)?;
+        return Some(Snapshot {
+            path: base_path,
+            old: None,
+            new: Some(FileReference::Source(ImageSource::Bytes {
+                uri: Cow::Owned(format!("bytes://{}", png_path.display())),
+                bytes: eframe::egui::load::Bytes::Shared(new_data.clone().into()),
+            })),
+            diff: None,
+        });
     }
 
     // Get variant paths
@@ -271,4 +288,14 @@ fn get_variant_path(base_path: &Path, variant: &str) -> Option<PathBuf> {
     let stem = base_path.file_stem()?.to_str()?;
     let parent = base_path.parent().unwrap_or(Path::new(""));
     Some(parent.join(format!("{stem}.{variant}.png")))
+}
+
+/// Converts a variant path (e.g., "image.new.png") back to the base path ("image.png")
+fn get_base_path_from_variant(variant_path: &Path) -> Option<PathBuf> {
+    let stem = variant_path.file_stem()?.to_str()?;
+    let base_stem = stem
+        .strip_suffix(".new")
+        .or_else(|| stem.strip_suffix(".old"))?;
+    let parent = variant_path.parent().unwrap_or(Path::new(""));
+    Some(parent.join(format!("{base_stem}.png")))
 }
