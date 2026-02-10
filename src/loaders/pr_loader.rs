@@ -1,4 +1,4 @@
-use crate::github::model::{GithubPrLink, GithubRepoLink};
+use crate::github::model::GithubPrLink;
 use crate::github::octokit::RepoClient;
 use crate::github::pr::{GithubPr, pr_ui};
 use crate::loaders::{LoadSnapshots, sort_snapshots};
@@ -6,8 +6,8 @@ use crate::snapshot::{FileReference, Snapshot};
 use crate::state::AppStateRef;
 use eframe::egui::{Context, Ui};
 use egui_inbox::{UiInbox, UiInboxSender};
-use futures::StreamExt as _;
-use octocrab::models::repos::{DiffEntry, DiffEntryStatus};
+use futures::{StreamExt as _, TryStreamExt as _};
+use octocrab::models::repos::DiffEntryStatus;
 use octocrab::{Octocrab, Result};
 use std::pin::pin;
 use std::task::Poll;
@@ -60,50 +60,68 @@ async fn stream_files(
 
     let stream = file.into_stream(&repo_client);
 
-    let mut stream = pin!(stream);
+    let results = stream
+        .try_filter_map(|file| async move {
+            Ok(file.filename.ends_with(".png").then_some(file))
+        })
+        .map_ok(|file| {
+            let repo_client = &repo_client;
+            let pr = &pr;
+            async move {
+                let (old_url, new_url) = futures::join!(
+                    async {
+                        if file.status != DiffEntryStatus::Added {
+                            let name =
+                                file.previous_filename.as_deref().unwrap_or(&*file.filename);
+                            get_download_url(repo_client, &pr.base.sha, name).await
+                        } else {
+                            None
+                        }
+                    },
+                    async {
+                        if file.status != DiffEntryStatus::Removed {
+                            get_download_url(repo_client, &pr.head.sha, &file.filename).await
+                        } else {
+                            None
+                        }
+                    },
+                );
 
-    while let Some(file) = stream.next().await.transpose()? {
-        let file: DiffEntry = file;
-        if file.filename.ends_with(".png") {
-            let old_url = if file.status != DiffEntryStatus::Added {
-                let old_file_name = file.previous_filename.as_deref().unwrap_or(&*file.filename);
-                Some(create_media_url(
-                    repo_client.repo(),
-                    &pr.base.sha,
-                    old_file_name,
-                ))
-            } else {
-                None
-            };
+                Ok::<_, octocrab::Error>(Snapshot {
+                    path: file.filename.clone().into(),
+                    old: old_url.map(|url| FileReference::Source(url.into())),
+                    new: new_url.map(|url| FileReference::Source(url.into())),
+                    diff: None,
+                })
+            }
+        })
+        .try_buffer_unordered(4);
+    let mut results = pin!(results);
 
-            let new_url = if file.status != DiffEntryStatus::Removed {
-                Some(create_media_url(
-                    repo_client.repo(),
-                    &pr.head.sha,
-                    &file.filename,
-                ))
-            } else {
-                None
-            };
-
-            let snapshot = Snapshot {
-                path: file.filename.clone().into(),
-                old: old_url.map(|url| FileReference::Source(url.into())),
-                new: new_url.map(|url| FileReference::Source(url.into())),
-                diff: None,
-            };
-            sender.send(Some(Ok(snapshot))).ok();
-        }
+    while let Some(snapshot) = results.next().await.transpose()? {
+        sender.send(Some(Ok(snapshot))).ok();
     }
 
     Ok(())
 }
 
-fn create_media_url(repo: &GithubRepoLink, commit_sha: &str, file_path: &str) -> String {
-    format!(
-        "https://media.githubusercontent.com/media/{}/{}/{}/{}",
-        repo.owner, repo.repo, commit_sha, file_path,
-    )
+/// Gets a signed download URL via the GitHub contents API.
+/// The returned URL includes a `?token=` parameter that works for private repos.
+async fn get_download_url(
+    repo_client: &RepoClient,
+    commit_sha: &str,
+    file_path: &str,
+) -> Option<String> {
+    let content = repo_client
+        .repos()
+        .get_content()
+        .path(file_path)
+        .r#ref(commit_sha)
+        .send()
+        .await
+        .ok()?;
+
+    content.items.first()?.download_url.clone()
 }
 
 impl LoadSnapshots for PrLoader {
