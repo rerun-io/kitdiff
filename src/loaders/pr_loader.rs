@@ -29,8 +29,7 @@ impl PrLoader {
         let repo_client = RepoClient::new(client.clone(), link.repo.clone());
 
         inbox.spawn(|tx| async move {
-            let result =
-                stream_files(repo_client, link.pr_number, tx.clone(), logged_in).await;
+            let result = stream_files(repo_client, link.pr_number, tx.clone(), logged_in).await;
             match result {
                 Ok(()) => {
                     tx.send(None).ok();
@@ -65,9 +64,7 @@ async fn stream_files(
     let stream = file.into_stream(&repo_client);
 
     let results = stream
-        .try_filter_map(|file| async move {
-            Ok(file.filename.ends_with(".png").then_some(file))
-        })
+        .try_filter_map(|file| async move { Ok(file.filename.ends_with(".png").then_some(file)) })
         .map_ok(|file| {
             let repo_client = &repo_client;
             let pr = &pr;
@@ -75,8 +72,7 @@ async fn stream_files(
                 let (old_url, new_url) = futures::join!(
                     async {
                         if file.status != DiffEntryStatus::Added {
-                            let name =
-                                file.previous_filename.as_deref().unwrap_or(&*file.filename);
+                            let name = file.previous_filename.as_deref().unwrap_or(&*file.filename);
                             resolve_url(repo_client, &pr.base.sha, name, logged_in).await
                         } else {
                             None
@@ -84,8 +80,7 @@ async fn stream_files(
                     },
                     async {
                         if file.status != DiffEntryStatus::Removed {
-                            resolve_url(repo_client, &pr.head.sha, &file.filename, logged_in)
-                                .await
+                            resolve_url(repo_client, &pr.head.sha, &file.filename, logged_in).await
                         } else {
                             None
                         }
