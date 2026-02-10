@@ -50,6 +50,7 @@ impl DiffSource {
             Self::Pr(url) => Box::new(loaders::pr_loader::PrLoader::new(
                 url,
                 state.github_auth.client(),
+                state.github_auth.get_token().is_some(),
             )),
             Self::GHArtifact(artifact) => {
                 Box::new(loaders::gh_archive_loader::GHArtifactLoader::new(
