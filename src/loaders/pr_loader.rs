@@ -6,8 +6,8 @@ use crate::snapshot::{FileReference, Snapshot};
 use crate::state::AppStateRef;
 use eframe::egui::{Context, Ui};
 use egui_inbox::{UiInbox, UiInboxSender};
-use futures::StreamExt as _;
-use octocrab::models::repos::{DiffEntry, DiffEntryStatus};
+use futures::{StreamExt as _, TryStreamExt as _};
+use octocrab::models::repos::DiffEntryStatus;
 use octocrab::{Octocrab, Result};
 use std::pin::pin;
 use std::task::Poll;
@@ -20,15 +20,16 @@ pub struct PrLoader {
     state: Poll<anyhow::Result<()>>,
     link: GithubPrLink,
     pr_info: GithubPr,
+    logged_in: bool,
 }
 
 impl PrLoader {
-    pub fn new(link: GithubPrLink, client: Octocrab) -> Self {
+    pub fn new(link: GithubPrLink, client: Octocrab, logged_in: bool) -> Self {
         let mut inbox = UiInbox::new();
         let repo_client = RepoClient::new(client.clone(), link.repo.clone());
 
         inbox.spawn(|tx| async move {
-            let result = stream_files(repo_client, link.pr_number, tx.clone()).await;
+            let result = stream_files(repo_client, link.pr_number, tx.clone(), logged_in).await;
             match result {
                 Ok(()) => {
                     tx.send(None).ok();
@@ -45,6 +46,7 @@ impl PrLoader {
             state: Poll::Pending,
             pr_info: GithubPr::new(link.clone(), client),
             link,
+            logged_in,
         }
     }
 }
@@ -53,6 +55,7 @@ async fn stream_files(
     repo_client: RepoClient,
     pr_number: u64,
     sender: Sender,
+    logged_in: bool,
 ) -> octocrab::Result<()> {
     let pr = repo_client.pulls().get(pr_number).await?;
 
@@ -60,43 +63,70 @@ async fn stream_files(
 
     let stream = file.into_stream(&repo_client);
 
-    let mut stream = pin!(stream);
+    let results = stream
+        .try_filter_map(|file| async move { Ok(file.filename.ends_with(".png").then_some(file)) })
+        .map_ok(|file| {
+            let repo_client = &repo_client;
+            let pr = &pr;
+            async move {
+                let (old_url, new_url) = futures::join!(
+                    async {
+                        if file.status != DiffEntryStatus::Added {
+                            let name = file.previous_filename.as_deref().unwrap_or(&*file.filename);
+                            resolve_url(repo_client, &pr.base.sha, name, logged_in).await
+                        } else {
+                            None
+                        }
+                    },
+                    async {
+                        if file.status != DiffEntryStatus::Removed {
+                            resolve_url(repo_client, &pr.head.sha, &file.filename, logged_in).await
+                        } else {
+                            None
+                        }
+                    },
+                );
 
-    while let Some(file) = stream.next().await.transpose()? {
-        let file: DiffEntry = file;
-        if file.filename.ends_with(".png") {
-            let old_url = if file.status != DiffEntryStatus::Added {
-                let old_file_name = file.previous_filename.as_deref().unwrap_or(&*file.filename);
-                Some(create_media_url(
-                    repo_client.repo(),
-                    &pr.base.sha,
-                    old_file_name,
-                ))
-            } else {
-                None
-            };
+                Ok::<_, octocrab::Error>(Snapshot {
+                    path: file.filename.clone().into(),
+                    old: old_url.map(|url| FileReference::Source(url.into())),
+                    new: new_url.map(|url| FileReference::Source(url.into())),
+                    diff: None,
+                })
+            }
+        })
+        .try_buffer_unordered(4);
+    let mut results = pin!(results);
 
-            let new_url = if file.status != DiffEntryStatus::Removed {
-                Some(create_media_url(
-                    repo_client.repo(),
-                    &pr.head.sha,
-                    &file.filename,
-                ))
-            } else {
-                None
-            };
-
-            let snapshot = Snapshot {
-                path: file.filename.clone().into(),
-                old: old_url.map(|url| FileReference::Source(url.into())),
-                new: new_url.map(|url| FileReference::Source(url.into())),
-                diff: None,
-            };
-            sender.send(Some(Ok(snapshot))).ok();
-        }
+    while let Some(snapshot) = results.next().await.transpose()? {
+        sender.send(Some(Ok(snapshot))).ok();
     }
 
     Ok(())
+}
+
+/// When logged in, uses the GitHub contents API to get a signed download URL
+/// that works for private repos. Otherwise, falls back to the public
+/// media.githubusercontent.com URL to avoid burning API rate limit.
+async fn resolve_url(
+    repo_client: &RepoClient,
+    commit_sha: &str,
+    file_path: &str,
+    logged_in: bool,
+) -> Option<String> {
+    if logged_in {
+        let content = repo_client
+            .repos()
+            .get_content()
+            .path(file_path)
+            .r#ref(commit_sha)
+            .send()
+            .await
+            .ok()?;
+        content.items.first()?.download_url.clone()
+    } else {
+        Some(create_media_url(repo_client.repo(), commit_sha, file_path))
+    }
 }
 
 fn create_media_url(repo: &GithubRepoLink, commit_sha: &str, file_path: &str) -> String {
@@ -126,7 +156,7 @@ impl LoadSnapshots for PrLoader {
     }
 
     fn refresh(&mut self, client: Octocrab) {
-        *self = Self::new(self.link.clone(), client);
+        *self = Self::new(self.link.clone(), client, self.logged_in);
     }
 
     fn snapshots(&self) -> &[Snapshot] {
