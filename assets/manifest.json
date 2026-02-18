@@ -1,6 +1,6 @@
 {
-  "name": "egui Template PWA",
-  "short_name": "egui-template-pwa",
+  "name": "kitdiff",
+  "short_name": "kitdiff",
   "icons": [
     {
       "src": "./assets/icon-256.png",
