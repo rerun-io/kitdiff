@@ -1,25 +1,53 @@
 use crate::state::{FilteredSnapshot, ViewerAppStateRef, ViewerSystemCommand};
 use eframe::egui;
-use eframe::egui::{Id, ScrollArea, TextEdit, Ui, Widget as _};
+use eframe::egui::{Id, OpenUrl, ScrollArea, TextEdit, Ui};
+use re_ui::UiExt as _;
+use re_ui::alert::Alert;
 use re_ui::list_item::LabelContent;
-use re_ui::{UiExt as _, icons};
 use std::task::Poll;
+
+fn is_github_permission_error(err: &anyhow::Error) -> bool {
+    for cause in err.chain() {
+        if let Some(github_err) = cause.downcast_ref::<octocrab::GitHubError>() {
+            return matches!(
+                github_err.status_code,
+                reqwest::StatusCode::FORBIDDEN | reqwest::StatusCode::NOT_FOUND
+            );
+        }
+    }
+    // octocrab can fail to parse a 404 error body, producing a serde error instead
+    let msg = err.to_string().to_lowercase();
+    msg.contains("not found") || msg.contains("missing field")
+}
 
 pub fn file_tree(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
     ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
 
     state.loader.extra_ui(ui, state.app);
 
+    if let Poll::Ready(Err(e)) = state.loader.state() {
+        if is_github_permission_error(e) {
+            Alert::warning().show(ui, |ui: &mut Ui| {
+                ui.vertical(|ui| {
+                    ui.label("kitdiff does not have access to this repository.");
+                    if ui.link("Grant repository access").clicked() {
+                        ui.ctx().open_url(OpenUrl::new_tab(
+                            crate::github::auth::GitHubAuth::MANAGE_REPO_ACCESS_URL,
+                        ));
+                    }
+                });
+            });
+        } else {
+            Alert::error().show(ui, |ui: &mut Ui| {
+                ui.label(e.to_string());
+            });
+        }
+    }
+
     ui.panel_title_bar_with_buttons(&state.loader.files_header(), None, |ui| {
         match state.loader.state() {
             Poll::Ready(Ok(())) => {}
-            Poll::Ready(Err(e)) => {
-                icons::ERROR
-                    .as_image()
-                    .tint(ui.tokens().alert_error.icon)
-                    .ui(ui)
-                    .on_hover_text(e.to_string());
-            }
+            Poll::Ready(Err(_)) => {}
             Poll::Pending => {
                 ui.spinner();
             }

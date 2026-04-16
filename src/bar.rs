@@ -1,4 +1,4 @@
-use crate::github::auth::GithubAuthCommand;
+use crate::github::auth::{GitHubAuth, GithubAuthCommand};
 use crate::state::AppStateRef;
 use eframe::egui;
 use eframe::egui::{Popup, Ui};
@@ -26,6 +26,11 @@ pub fn auth_ui(ui: &mut Ui, state: &AppStateRef<'_>) {
             let response = ui.button(&logged_in.username);
 
             Popup::menu(&response).show(|ui| {
+                if ui.button("Manage repository access").clicked() {
+                    ui.ctx().open_url(egui::OpenUrl::new_tab(
+                        GitHubAuth::MANAGE_REPO_ACCESS_URL,
+                    ));
+                }
                 if ui.button("Log out").clicked() {
                     state.send(GithubAuthCommand::Logout);
                 }
