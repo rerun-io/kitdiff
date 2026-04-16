@@ -1,12 +1,12 @@
 use crate::github::auth::GithubAuthCommand;
 use crate::state::AppStateRef;
 use eframe::egui;
-use eframe::egui::{Context, Popup, Ui};
+use eframe::egui::{Popup, Ui};
 
-pub fn bar(ctx: &Context, state: &AppStateRef<'_>) {
-    egui::TopBottomPanel::top("top bar")
+pub fn bar(ui: &mut Ui, state: &AppStateRef<'_>) {
+    egui::Panel::top("top bar")
         .resizable(false)
-        .show(ctx, |ui| {
+        .show_inside(ui, |ui| {
             egui::Sides::new().show(
                 ui,
                 |_ui| {},

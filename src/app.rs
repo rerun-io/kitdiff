@@ -3,7 +3,7 @@ use crate::settings::Settings;
 use crate::state::{AppState, AppStateRef, PageRef, SystemCommand, ViewerSystemCommand};
 use crate::{DiffSource, bar, home, viewer};
 use crate::{config::Config, state::View};
-use eframe::egui::{Context, Modifiers};
+use eframe::egui::{Context, Modifiers, Ui};
 use eframe::{Frame, Storage, egui};
 use egui_extras::install_image_loaders;
 use egui_inbox::UiInbox;
@@ -52,29 +52,30 @@ impl eframe::App for App {
         eframe::set_value(storage, eframe::APP_KEY, &self.state.persist());
     }
 
-    fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
-        self.state.update(ctx);
-        self.inbox.read(ctx).for_each(|cmd| {
-            self.state.handle(ctx, cmd);
+    fn ui(&mut self, ui: &mut Ui, _frame: &mut Frame) {
+        let ctx = ui.ctx().clone();
+        self.state.update(&ctx);
+        self.inbox.read(&ctx).for_each(|cmd| {
+            self.state.handle(&ctx, cmd);
         });
 
         {
             let state_ref = self
                 .state
-                .reference(ctx, &self.diff_loader, self.inbox.sender());
+                .reference(&ctx, &self.diff_loader, self.inbox.sender());
 
-            bar::bar(ctx, &state_ref);
+            bar::bar(ui, &state_ref);
 
             match &state_ref.page {
                 PageRef::Home => {
-                    home::home_view(ctx, &state_ref);
+                    home::home_view(ui, &state_ref);
                 }
                 PageRef::DiffViewer(diff) => {
-                    viewer::viewer_ui(ctx, &diff.with_app(&state_ref));
+                    viewer::viewer_ui(ui, &diff.with_app(&state_ref));
                 }
             }
 
-            Self::end_frame(ctx, &state_ref);
+            Self::end_frame(&ctx, &state_ref);
         }
 
         // for file in &ctx.input(|i| i.raw.dropped_files.clone()) {
