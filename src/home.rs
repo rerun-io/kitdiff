@@ -1,10 +1,10 @@
 use crate::DiffSource;
 use crate::state::{AppStateRef, SystemCommand};
 use eframe::egui;
-use eframe::egui::{CentralPanel, Context, Id, TextEdit};
+use eframe::egui::{CentralPanel, Id, TextEdit, Ui};
 
-pub fn home_view(ctx: &Context, app: &AppStateRef<'_>) {
-    CentralPanel::default().show(ctx, |ui| {
+pub fn home_view(ui: &mut Ui, app: &AppStateRef<'_>) {
+    CentralPanel::default().show_inside(ui, |ui| {
         ui.heading("Kitdiff");
 
         ui.horizontal(|ui| {

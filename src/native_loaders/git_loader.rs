@@ -226,7 +226,7 @@ fn run_git_discovery(sender: &Sender, base_path: &Path) -> anyhow::Result<()> {
                         }
                     }
                 }
-                Ok(gix::object::tree::diff::Action::Continue)
+                Ok(gix::object::tree::diff::Action::Continue(()))
             },
         )?;
 

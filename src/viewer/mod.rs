@@ -4,15 +4,14 @@ mod viewer_options;
 
 use crate::state::ViewerAppStateRef;
 use eframe::egui;
-use eframe::egui::Context;
-use eframe::egui::panel::Side;
+use eframe::egui::Ui;
 
-pub fn viewer_ui(ctx: &Context, state: &ViewerAppStateRef<'_>) {
-    egui::SidePanel::new(Side::Left, "files").show(ctx, |ui| {
+pub fn viewer_ui(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
+    egui::Panel::left("files").show_inside(ui, |ui| {
         file_tree::file_tree(ui, state);
     });
 
-    egui::SidePanel::right("options").show(ctx, |ui| {
+    egui::Panel::right("options").show_inside(ui, |ui| {
         ui.set_width(ui.available_width());
 
         viewer_options::viewer_options(ui, state);
@@ -152,7 +151,7 @@ pub fn viewer_ui(ctx: &Context, state: &ViewerAppStateRef<'_>) {
         // });
     });
 
-    egui::CentralPanel::default().show(ctx, |ui| {
+    egui::CentralPanel::default().show_inside(ui, |ui| {
         diff_view::diff_view(ui, state);
     });
 }
