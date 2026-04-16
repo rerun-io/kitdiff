@@ -114,7 +114,8 @@ pub(crate) fn parse_auth_fragment(fragment: &str) -> anyhow::Result<AuthFragment
 
 impl GitHubAuth {
     const GITHUB_CLIENT_ID: &'static str = "Iv23li8RPCGatBkgBNaE";
-    const CALLBACK_URL: &'static str = "https://kitdiff-auth-720893688618.europe-west1.run.app/callback";
+    const CALLBACK_URL: &'static str =
+        "https://kitdiff-auth-720893688618.europe-west1.run.app/callback";
 
     pub fn new(state: AuthState, sender: UiInboxSender<SystemCommand>) -> Self {
         let this = Self {
