@@ -27,9 +27,8 @@ pub fn auth_ui(ui: &mut Ui, state: &AppStateRef<'_>) {
 
             Popup::menu(&response).show(|ui| {
                 if ui.button("Manage repository access").clicked() {
-                    ui.ctx().open_url(egui::OpenUrl::new_tab(
-                        GitHubAuth::MANAGE_REPO_ACCESS_URL,
-                    ));
+                    ui.ctx()
+                        .open_url(egui::OpenUrl::new_tab(GitHubAuth::MANAGE_REPO_ACCESS_URL));
                 }
                 if ui.button("Log out").clicked() {
                     state.send(GithubAuthCommand::Logout);
