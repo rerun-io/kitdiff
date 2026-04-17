@@ -45,12 +45,8 @@ pub fn file_tree(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
     }
 
     ui.panel_title_bar_with_buttons(&state.loader.files_header(), None, |ui| {
-        match state.loader.state() {
-            Poll::Ready(Ok(())) => {}
-            Poll::Ready(Err(_)) => {}
-            Poll::Pending => {
-                ui.spinner();
-            }
+        if state.loader.state().is_pending() {
+            ui.spinner();
         }
     });
 
