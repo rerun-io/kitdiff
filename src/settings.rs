@@ -16,6 +16,7 @@ pub struct Settings {
     pub texture_magnification: TextureFilter,
     pub use_original_diff: bool,
     pub options: DiffOptions,
+    #[serde(default)]
     pub auth: AuthState,
 }
 

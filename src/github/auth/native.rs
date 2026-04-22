@@ -1,4 +1,4 @@
-use crate::github::auth::{AuthSender, GitHubAuth, parse_supabase_fragment};
+use crate::github::auth::{AuthSender, GitHubAuth, parse_auth_fragment};
 use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -54,7 +54,7 @@ async fn auth_route(
 ) -> Result<String, Response<String>> {
     let fragment = body.fragment;
 
-    let data = parse_supabase_fragment(&fragment).map_err(|e| {
+    let data = parse_auth_fragment(&fragment).map_err(|e| {
         Response::builder()
             .status(StatusCode::INTERNAL_SERVER_ERROR)
             .body(e.to_string())

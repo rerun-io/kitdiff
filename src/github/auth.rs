@@ -30,9 +30,7 @@ pub struct AuthState {
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct LoggedInState {
-    pub supabase_token: String,
-    pub github_token: String, // GitHub OAuth token
-    expires_at: u64,
+    pub github_token: String,
     pub username: String,
     pub user_image: Option<String>,
 }
@@ -106,19 +104,20 @@ pub fn github_artifact_api_url(owner: &str, repo: &str, artifact_id: &str) -> St
 }
 
 #[derive(serde::Deserialize)]
-struct AuthFragment {
-    access_token: String,
-    provider_token: String, // The github token
-    expires_at: u64,
+pub(crate) struct AuthFragment {
+    token: String,
 }
 
-fn parse_supabase_fragment(fragment: &str) -> anyhow::Result<AuthFragment> {
+pub(crate) fn parse_auth_fragment(fragment: &str) -> anyhow::Result<AuthFragment> {
     Ok(serde_urlencoded::from_str(fragment)?)
 }
 
 impl GitHubAuth {
-    pub const SUPABASE_URL: &'static str = "https://fqhsaeyjqrjmlkqflvho.supabase.co";
-    pub const SUPABASE_ANON_KEY: &'static str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxaHNhZXlqcXJqbWxrcWZsdmhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgyMTk4MzIsImV4cCI6MjA3Mzc5NTgzMn0.TuhMjHhBCNyKquyVWq3djOfpBVDhcpSmNRWSErpseuw";
+    const GITHUB_CLIENT_ID: &'static str = "Iv23li8RPCGatBkgBNaE";
+    const CALLBACK_URL: &'static str =
+        "https://kitdiff-auth-720893688618.europe-west1.run.app/callback";
+    pub const MANAGE_REPO_ACCESS_URL: &'static str =
+        "https://github.com/apps/kitdiff/installations/new";
 
     pub fn new(state: AuthState, sender: UiInboxSender<SystemCommand>) -> Self {
         let this = Self {
@@ -127,28 +126,10 @@ impl GitHubAuth {
             sender,
         };
 
-        // if this.check_expired() {
-        //     this.sender
-        //         .send(SystemCommand::GithubAuth(GithubAuthCommand::Login))
-        //         .ok();
-        // }
         auth_impl::check_for_auth_callback(this.inbox.sender());
 
         this
     }
-    // Apparently the github token is valid indefinitely?
-    // fn check_expired(&mut self) -> bool {
-    //     if let Some(logged_in) = &self.state.logged_in {
-    //         let now = web_time::SystemTime::now()
-    //             .duration_since(web_time::UNIX_EPOCH)
-    //             .expect("Time went backwards")
-    //             .as_secs();
-    //         dbg!(now, logged_in.expires_at);
-    //         now >= logged_in.expires_at - 60 * 60 // When opening the app the token is valid for at least 1 hour
-    //     } else {
-    //         false
-    //     }
-    // }
 
     #[expect(clippy::needless_pass_by_value)]
     pub fn handle(&mut self, ctx: &Context, cmd: GithubAuthCommand) {
@@ -162,32 +143,30 @@ impl GitHubAuth {
 
     pub fn auth_url(origin: &str) -> String {
         #[derive(serde::Serialize)]
-        struct AuthParams {
-            redirect_to: String,
-            provider: String,
-            scopes: String,
+        struct AuthParams<'a> {
+            client_id: &'a str,
+            redirect_uri: &'a str,
+            state: &'a str,
         }
 
         let query = serde_urlencoded::to_string(&AuthParams {
-            redirect_to: origin.to_owned(),
-            provider: "github".to_owned(),
-            scopes: "repo".to_owned(),
+            client_id: Self::GITHUB_CLIENT_ID,
+            redirect_uri: Self::CALLBACK_URL,
+            state: origin,
         })
         .unwrap_or_default();
 
-        format!("{}/auth/v1/authorize?{}", Self::SUPABASE_URL, query)
+        format!("https://github.com/login/oauth/authorize?{query}")
     }
 
     async fn handle_callback_fragment(tx: AuthSender, data: AuthFragment) {
-        let username = Self::fetch_user_info(&data.provider_token).await;
+        let username = Self::fetch_user_info(&data.token).await;
 
         match username {
             Ok(username) => {
                 tx.send(AuthEvent::LoginSuccessful(AuthState {
                     logged_in: Some(LoggedInState {
-                        github_token: data.provider_token,
-                        supabase_token: data.access_token,
-                        expires_at: data.expires_at,
+                        github_token: data.token,
                         username: username.login,
                         user_image: Some(username.avatar_url.to_string()),
                     }),
