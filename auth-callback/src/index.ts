@@ -6,13 +6,10 @@ const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID!;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET!;
 const PORT = process.env.PORT || 8080;
 
-const ALLOWED_ORIGINS = [
-  "https://rerun-io.github.io/kitdiff",
-  "https://rerun-io.github.io/kitdiff/",
-];
+const ALLOWED_PREFIX = "https://rerun-io.github.io/kitdiff/";
 
 function isAllowedRedirect(url: string): boolean {
-  if (ALLOWED_ORIGINS.includes(url)) {
+  if (url.startsWith(ALLOWED_PREFIX)) {
     return true;
   }
   try {
