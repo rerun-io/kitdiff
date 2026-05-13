@@ -14,7 +14,7 @@ use std::pin::pin;
 use std::task::Poll;
 
 /// Percent-encode path segments for use in a URL path, preserving `/`.
-/// Mirrors the `PATH` set from the URL spec but lets utf8_percent_encode handle non-ASCII.
+/// Mirrors the `PATH` set from the URL spec but lets `utf8_percent_encode` handle non-ASCII.
 const PATH_SEGMENT: &AsciiSet = &CONTROLS
     .add(b' ')
     .add(b'"')
