@@ -10,20 +10,33 @@ pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
             state.app.settings.options,
         );
 
-        if let Some(info) =
-            diff_uri.and_then(|diff_uri| state.app.diff_image_loader.diff_info(&diff_uri))
-        {
-            if info.diff == 0 {
-                ui.strong("All differences below threshold!");
-            } else {
+        let diff_info = diff_uri
+            .as_deref()
+            .and_then(|uri| state.app.diff_image_loader.diff_info(uri));
+
+        match &diff_info {
+            Some(Ok(info)) => {
+                if info.diff == 0 {
+                    ui.strong("All differences below threshold!");
+                } else {
+                    ui.label(
+                        RichText::new(format!("Diff pixels: {}", info.diff))
+                            .color(ui.visuals().warn_fg_color),
+                    );
+                }
+            }
+            Some(Err(err)) => {
                 ui.label(
-                    RichText::new(format!("Diff pixels: {}", info.diff))
-                        .color(ui.visuals().warn_fg_color),
+                    RichText::new(format!("Diff failed: {err}"))
+                        .color(ui.visuals().error_fg_color),
                 );
             }
-        } else {
-            ui.label("No diff info yet...");
+            None => {
+                ui.label("No diff info yet...");
+            }
         }
+
+        let diff_failed = matches!(diff_info, Some(Err(_)));
 
         let rect = ui.available_rect_before_wrap();
 
@@ -51,7 +64,9 @@ pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
             ui.place(rect, new);
         }
 
-        if let Some(diff) = diff {
+        if let Some(diff) = diff
+            && !diff_failed
+        {
             ui.place(rect, diff);
         }
 
