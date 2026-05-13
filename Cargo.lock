@@ -4463,6 +4463,7 @@ dependencies = [
  "log",
  "octocrab",
  "octocrab-wasm",
+ "percent-encoding",
  "re_ui",
  "reqwest",
  "serde",

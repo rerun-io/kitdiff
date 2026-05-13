@@ -9,8 +9,22 @@ use egui_inbox::{UiInbox, UiInboxSender};
 use futures::{StreamExt as _, TryStreamExt as _};
 use octocrab::models::repos::DiffEntryStatus;
 use octocrab::{Octocrab, Result};
+use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
 use std::pin::pin;
 use std::task::Poll;
+
+/// Percent-encode path segments for use in a URL path, preserving `/`.
+/// Mirrors the `PATH` set from the URL spec but lets `utf8_percent_encode` handle non-ASCII.
+const PATH_SEGMENT: &AsciiSet = &CONTROLS
+    .add(b' ')
+    .add(b'"')
+    .add(b'#')
+    .add(b'<')
+    .add(b'>')
+    .add(b'?')
+    .add(b'`')
+    .add(b'{')
+    .add(b'}');
 
 type Sender = UiInboxSender<Option<Result<Snapshot>>>;
 
@@ -114,18 +128,23 @@ async fn resolve_url(
     file_path: &str,
     logged_in: bool,
 ) -> Option<String> {
+    let encoded_path = utf8_percent_encode(file_path, PATH_SEGMENT).to_string();
     if logged_in {
         let content = repo_client
             .repos()
             .get_content()
-            .path(file_path)
+            .path(&encoded_path)
             .r#ref(commit_sha)
             .send()
             .await
             .ok()?;
         content.items.first()?.download_url.clone()
     } else {
-        Some(create_media_url(repo_client.repo(), commit_sha, file_path))
+        Some(create_media_url(
+            repo_client.repo(),
+            commit_sha,
+            &encoded_path,
+        ))
     }
 }
 

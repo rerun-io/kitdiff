@@ -72,14 +72,13 @@ impl DiffImageLoader {
         }
     }
 
-    pub fn diff_info(&self, uri: &str) -> Option<DiffInfo> {
-        if let Some(image) = self.diffs.lock().get(uri) {
-            match image {
-                Ok(Poll::Ready(result)) => Some(result.clone()),
-                _ => None,
-            }
-        } else {
-            None
+    /// `Some(Ok(info))` once the diff is ready, `None` while pending or before it has
+    /// started, and `Some(Err(msg))` if the diff failed to load (e.g. mismatched image sizes).
+    pub fn diff_info(&self, uri: &str) -> Option<Result<DiffInfo, String>> {
+        match self.diffs.lock().get(uri) {
+            Some(Ok(Poll::Ready(info))) => Some(Ok(info.clone())),
+            Some(Ok(Poll::Pending)) | None => None,
+            Some(Err(err)) => Some(Err(err.to_string())),
         }
     }
 }
@@ -122,17 +121,17 @@ impl ImageLoader for DiffImageLoader {
                 std::thread::Builder::new()
                     .name(format!("diff for {uri}"))
                     .spawn(move || {
-                        ctx.request_repaint();
                         let result = load_diffs(&ctx, &old_image, &new_image, size_hint, &diff_uri);
                         cache.lock().insert(uri, result.map(Poll::Ready));
+                        ctx.request_repaint();
                     })
                     .expect("Failed to spawn diff thread");
                 #[cfg(target_arch = "wasm32")]
                 {
                     wasm_bindgen_futures::spawn_local(async move {
-                        ctx.request_repaint();
                         let result = load_diffs(&ctx, &old_image, &new_image, size_hint, &diff_uri);
                         cache.lock().insert(uri, result.map(Poll::Ready));
+                        ctx.request_repaint();
                     });
                 }
             }
