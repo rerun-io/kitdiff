@@ -27,8 +27,7 @@ pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
             }
             Some(Err(err)) => {
                 ui.label(
-                    RichText::new(format!("Diff failed: {err}"))
-                        .color(ui.visuals().error_fg_color),
+                    RichText::new(format!("Diff failed: {err}")).color(ui.visuals().error_fg_color),
                 );
             }
             None => {

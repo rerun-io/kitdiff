@@ -140,7 +140,11 @@ async fn resolve_url(
             .ok()?;
         content.items.first()?.download_url.clone()
     } else {
-        Some(create_media_url(repo_client.repo(), commit_sha, &encoded_path))
+        Some(create_media_url(
+            repo_client.repo(),
+            commit_sha,
+            &encoded_path,
+        ))
     }
 }
 
