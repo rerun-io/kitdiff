@@ -1,7 +1,7 @@
+use ahash::HashMap;
 use eframe::egui::load::{ImageLoadResult, ImageLoader, ImagePoll, LoadError};
 use eframe::egui::mutex::Mutex;
 use eframe::egui::{Color32, ColorImage, Context, SizeHint};
-use eframe::epaint::ahash::HashMap;
 use egui_extras::loaders::image_loader::ImageCrateLoader;
 use std::sync::Arc;
 use std::task::Poll;
