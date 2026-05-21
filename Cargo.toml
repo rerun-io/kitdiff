@@ -21,17 +21,28 @@ targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
 anyhow = "1.0.100"
 bytes = "1.10.1"
 dify = "0.8.0"
-eframe = { version = "0.34.1", features = ["glow", "default", "persistence", "ron"] }
+eframe = { version = "0.34.1", features = [
+  "glow",
+  "default",
+  "persistence",
+  "ron",
+] }
 egui_extras = { version = "0.34.1", features = ["image", "file", "http"] }
 egui_inbox = { version = "0.11.0", features = ["async", "tokio"] }
-env_logger = { version = "0.11.8", default-features = false, features = ["auto-color", "humantime"] }
+env_logger = { version = "0.11.8", default-features = false, features = [
+  "auto-color",
+  "humantime",
+] }
 flate2 = { version = "1.1" }
 futures = "0.3.31"
 graphql_client = "0.16.0"
 hello_egui_utils = "0.11.0"
 image = "0.25.8"
 log = "0.4.28"
-octocrab = { version = "0.49.7", default-features = false, features = ["stream", "jwt-rust-crypto"] }
+octocrab = { version = "0.49.7", default-features = false, features = [
+  "stream",
+  "jwt-rust-crypto",
+] }
 octocrab-wasm = { path = "crates/octocrab-wasm" }
 percent-encoding = "2.3.2"
 re_ui = { git = "https://github.com/rerun-io/rerun", branch = "main" }
@@ -47,7 +58,12 @@ zip = { version = "8.5.1", default-features = false, features = ["deflate"] }
 axum = "0.8.6"
 clap = { version = "4.5", features = ["derive"] }
 env_logger = "0.11.8"
-gix = { version = "0.81", default-features = false, features = ["blocking-network-client", "blob-diff", "merge", "sha1"] }
+gix = { version = "0.81", default-features = false, features = [
+  "blocking-network-client",
+  "blob-diff",
+  "merge",
+  "sha1",
+] }
 ignore = { version = "0.4" }
 tokio = { version = "1.47", features = ["full"] }
 
@@ -57,7 +73,14 @@ getrandom = { version = "0.3", features = ["wasm_js"] }
 js-sys = { version = "0.3.81" }
 wasm-bindgen = { version = "0.2.104" }
 wasm-bindgen-futures = { version = "0.4.54" }
-web-sys = { version = "0.3.81", features = ["Window", "Location", "History", "Navigator", "Clipboard", "Performance"] }
+web-sys = { version = "0.3.81", features = [
+  "Window",
+  "Location",
+  "History",
+  "Navigator",
+  "Clipboard",
+  "Performance",
+] }
 
 [profile.release]
 opt-level = 2 # fast and small wasm
@@ -70,9 +93,9 @@ opt-level = 2
 [patch.crates-io]
 
 # If you want to use the bleeding edge version of egui and eframe:
-# egui = { git = "https://github.com/emilk/egui", branch = "main" }
-# eframe = { git = "https://github.com/emilk/egui", branch = "main" }
-# egui_extras = { git = "https://github.com/emilk/egui", branch = "main" }
+egui = { git = "https://github.com/emilk/egui", branch = "main" }
+eframe = { git = "https://github.com/emilk/egui", branch = "main" }
+egui_extras = { git = "https://github.com/emilk/egui", branch = "main" }
 
 # re_ui = { git = "https://github.com/rerun-io/rerun", branch = "main" }
 # egui_commonmark = { git = "https://github.com/rerun-io/egui_commonmark.git", branch = "lucas/update-egui-main" }
@@ -80,7 +103,6 @@ opt-level = 2
 # If you fork https://github.com/emilk/egui you can test with:
 # egui = { path = "../egui/crates/egui" }
 # eframe = { path = "../egui/crates/eframe" }
-
 
 
 # ----------------------------------------------------------------------------------------
@@ -130,11 +152,11 @@ dbg_macro = "warn"
 debug_assert_with_mut_call = "warn"
 default_union_representation = "warn"
 derive_partial_eq_without_eq = "warn"
-disallowed_macros = "warn"                  # See clippy.toml
-disallowed_methods = "warn"                 # See clippy.toml
-disallowed_names = "warn"                   # See clippy.toml
-disallowed_script_idents = "warn"           # See clippy.toml
-disallowed_types = "warn"                   # See clippy.toml
+disallowed_macros = "warn"                   # See clippy.toml
+disallowed_methods = "warn"                  # See clippy.toml
+disallowed_names = "warn"                    # See clippy.toml
+disallowed_script_idents = "warn"            # See clippy.toml
+disallowed_types = "warn"                    # See clippy.toml
 doc_comment_double_space_linebreaks = "warn"
 doc_include_without_cfg = "warn"
 doc_link_with_quotes = "warn"
@@ -194,7 +216,7 @@ manual_instant_elapsed = "warn"
 manual_is_power_of_two = "warn"
 manual_is_variant_and = "warn"
 manual_let_else = "warn"
-manual_midpoint = "warn" # NOTE `midpoint` is often a lot slower for floats, so we have our own `emath::fast_midpoint` function.
+manual_midpoint = "warn"                     # NOTE `midpoint` is often a lot slower for floats, so we have our own `emath::fast_midpoint` function.
 manual_ok_or = "warn"
 manual_string_new = "warn"
 map_err_ignore = "warn"
@@ -292,5 +314,5 @@ zero_sized_map_values = "warn"
 # TODO: enable?
 missing_errors_doc = "allow"
 
-manual_range_contains = "allow"       # this is better on 'allow'
-map_unwrap_or = "allow"               # this is better on 'allow'
+manual_range_contains = "allow" # this is better on 'allow'
+map_unwrap_or = "allow"         # this is better on 'allow'
