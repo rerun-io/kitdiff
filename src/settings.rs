@@ -4,7 +4,12 @@ use eframe::egui::TextureFilter;
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ImageMode {
+    /// One physical pixel in the input maps to one physical pixel in the output.
     Pixel,
+
+    /// One physical pixel in the input maps to two physical pixels in the output.
+    Pixel2,
+
     Fit,
 }
 

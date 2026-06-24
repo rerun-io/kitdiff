@@ -105,6 +105,9 @@ impl Snapshot {
             crate::settings::ImageMode::Pixel => {
                 image = image.fit_to_original_size(1.0 / state.egui_ctx.pixels_per_point());
             }
+            crate::settings::ImageMode::Pixel2 => {
+                image = image.fit_to_original_size(2.0 / state.egui_ctx.pixels_per_point());
+            }
             crate::settings::ImageMode::Fit => {}
         }
         image

@@ -51,6 +51,7 @@ pub fn viewer_options(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
     ui.horizontal_wrapped(|ui| {
         ui.label("Size:");
         ui.selectable_value(&mut settings.mode, ImageMode::Pixel, "1:1");
+        ui.selectable_value(&mut settings.mode, ImageMode::Pixel2, "2:1");
         ui.selectable_value(&mut settings.mode, ImageMode::Fit, "Fit");
     });
 
