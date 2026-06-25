@@ -1,0 +1,10 @@
+# Pin `cross` images to a known-good release so the C toolchain that
+# `ring` needs (e.g. `arm-linux-musleabihf-gcc`) is present.
+# Without this, the floating `:latest` images drift and drop the
+# cross-compiler, breaking the arm musl builds.
+
+[target.arm-unknown-linux-musleabihf]
+image = "ghcr.io/cross-rs/arm-unknown-linux-musleabihf:0.2.5"
+
+[target.armv7-unknown-linux-musleabihf]
+image = "ghcr.io/cross-rs/armv7-unknown-linux-musleabihf:0.2.5"
