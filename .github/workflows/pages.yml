@@ -14,6 +14,11 @@ on:
 permissions:
   contents: write # for committing to gh-pages branch.
 
+# Prevent races during deploy
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
 jobs:
   build-github-pages:
     runs-on: ubuntu-latest
