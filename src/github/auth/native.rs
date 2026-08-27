@@ -2,7 +2,7 @@ use crate::github::auth::{AuthSender, GitHubAuth, parse_auth_fragment};
 use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::response::{Html, Response};
+use axum::response::Html;
 use eframe::egui::{Context, OpenUrl};
 use std::net::{Ipv4Addr, SocketAddrV4};
 use tokio::spawn;
@@ -51,15 +51,11 @@ struct AuthBody {
 async fn auth_route(
     State(tx): State<AuthSender>,
     Json(body): Json<AuthBody>,
-) -> Result<String, Response<String>> {
+) -> Result<String, (StatusCode, String)> {
     let fragment = body.fragment;
 
-    let data = parse_auth_fragment(&fragment).map_err(|e| {
-        Response::builder()
-            .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(e.to_string())
-            .expect("Failed to build error response")
-    })?;
+    let data = parse_auth_fragment(&fragment)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     GitHubAuth::handle_callback_fragment(tx, data).await;
 
