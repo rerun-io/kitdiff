@@ -60,12 +60,18 @@ axum = "0.8.6"
 clap = { version = "4.5", features = ["derive"] }
 env_logger = "0.11.8"
 gix = { version = "0.81", default-features = false, features = [
+  "attributes",
   "blocking-network-client",
   "blob-diff",
   "merge",
+  "parallel",
+  "revision",
   "sha1",
+  "status",
 ] }
 ignore = { version = "0.4" }
+# To recognize unchanged git-lfs files by their pointer's sha256
+sha2 = "0.10.9"
 tokio = { version = "1.47", features = ["full"] }
 
 # web:
