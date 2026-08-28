@@ -1,0 +1,8 @@
+[default]
+extend-ignore-identifiers-re = [
+  # A method name from the `gix` crate
+  "rela_path",
+]
+
+[files]
+extend-exclude = ["github.graphql"]
