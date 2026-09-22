@@ -1,5 +1,10 @@
 use crate::state::ViewerAppStateRef;
-use eframe::egui::{Image, Response, RichText, Sense, SizeHint, Ui, load::ImagePoll};
+use eframe::egui::{
+    Color32, CursorIcon, Image, Mesh, Rect, Response, RichText, Sense, Shape, SizeHint,
+    TextureOptions, Ui, Vec2,
+    load::{ImagePoll, TexturePoll},
+    pos2, remap_clamp,
+};
 
 pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
     ui.label("Use 1/2/3 to only show old / new / diff at 100% opacity. Arrow keys to navigate.");
@@ -55,21 +60,35 @@ pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
 
         let any_loading = is_loading(&old) || is_loading(&new) || is_loading(&diff);
 
-        if let Some(old) = old {
-            let response = ui.place(rect, old.sense(Sense::click()));
-            copy_image_context_menu(&response, snapshot.old_uri().as_deref());
+        // Bottom-to-top draw order:
+        let layers = [
+            (old, snapshot.old_uri()),
+            (new, snapshot.new_uri()),
+            (if diff_failed { None } else { diff }, diff_uri.clone()),
+        ];
+
+        // What the magnifier needs to re-create the blend, in the same order:
+        let mut magnifier_layers: Vec<(String, Color32)> = Vec::new();
+        let mut top_response: Option<Response> = None;
+
+        for (image, uri) in layers {
+            let Some(image) = image else {
+                continue;
+            };
+            let tint = image.image_options().tint;
+            let response = ui.place(rect, image.sense(Sense::click()));
+            copy_image_context_menu(&response, uri.as_deref());
+            if let Some(uri) = uri {
+                magnifier_layers.push((uri, tint));
+            }
+            top_response = Some(response);
         }
 
-        if let Some(new) = new {
-            let response = ui.place(rect, new.sense(Sense::click()));
-            copy_image_context_menu(&response, snapshot.new_uri().as_deref());
-        }
-
-        if let Some(diff) = diff
-            && !diff_failed
+        // Only the topmost image gets the hover, so it carries the magnifier for the whole stack.
+        if let Some(response) = top_response
+            && !response.context_menu_opened()
         {
-            let response = ui.place(rect, diff.sense(Sense::click()));
-            copy_image_context_menu(&response, diff_uri.as_deref());
+            magnifier_on_hover(&response, &magnifier_layers);
         }
 
         // Preload surrounding snapshots once our image is loaded
@@ -110,4 +129,65 @@ fn copy_image_context_menu(response: &Response, uri: Option<&str>) {
             ui.close();
         }
     });
+}
+
+/// How many points each texel of the image takes up in the magnifier.
+const MAGNIFIER_ZOOM: f32 = 16.0;
+
+/// Width and height of the magnifier window, in points.
+const MAGNIFIER_SIZE: f32 = 256.0;
+
+/// Show a zoomed-in, nearest-neighbor view of the images around the pointer.
+///
+/// `layers` are the image URIs and their tints, in bottom-to-top draw order,
+/// so that the magnifier shows the same blend as the main view.
+fn magnifier_on_hover(response: &Response, layers: &[(String, Color32)]) {
+    let image_rect = response.rect;
+
+    response
+        .clone()
+        .on_hover_cursor(CursorIcon::ZoomIn)
+        .on_hover_ui_at_pointer(|ui| {
+            let Some(pointer) = ui.ctx().pointer_latest_pos() else {
+                return;
+            };
+
+            let (_id, zoom_rect) = ui.allocate_space(Vec2::splat(MAGNIFIER_SIZE));
+
+            for (uri, tint) in layers {
+                // Load with nearest-neighbor filtering so the texels stay crisp when blown up.
+                let Ok(TexturePoll::Ready { texture }) =
+                    ui.ctx()
+                        .try_load_texture(uri, TextureOptions::NEAREST, SizeHint::default())
+                else {
+                    continue;
+                };
+
+                let Vec2 {
+                    x: tex_w,
+                    y: tex_h,
+                } = texture.size;
+                if tex_w <= 0.0 || tex_h <= 0.0 {
+                    continue;
+                }
+
+                // Half the size of the magnified area, in texels:
+                let radius = Vec2::splat(MAGNIFIER_SIZE / MAGNIFIER_ZOOM / 2.0)
+                    .min(Vec2::new(tex_w, tex_h) / 2.0);
+
+                let u = remap_clamp(pointer.x, image_rect.x_range(), 0.0..=tex_w)
+                    .clamp(radius.x, tex_w - radius.x);
+                let v = remap_clamp(pointer.y, image_rect.y_range(), 0.0..=tex_h)
+                    .clamp(radius.y, tex_h - radius.y);
+
+                let uv_rect = Rect::from_min_max(
+                    pos2((u - radius.x) / tex_w, (v - radius.y) / tex_h),
+                    pos2((u + radius.x) / tex_w, (v + radius.y) / tex_h),
+                );
+
+                let mut mesh = Mesh::with_texture(texture.id);
+                mesh.add_rect_with_uv(zoom_rect, uv_rect, *tint);
+                ui.painter().add(Shape::mesh(mesh));
+            }
+        });
 }
