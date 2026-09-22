@@ -1,10 +1,10 @@
 use crate::state::ViewerAppStateRef;
 use eframe::egui::{
-    Align2, Color32, CursorIcon, Image, Mesh, Rect, Response, RichText, Sense, Shape, SizeHint,
-    TextureOptions, Ui, Vec2,
+    Align2, Color32, CursorIcon, Image, Mesh, Pos2, Rect, Response, RichText, Sense, Shape,
+    SizeHint, TextureOptions, Ui, Vec2,
     emath::GuiRounding as _,
     load::{ImagePoll, TexturePoll},
-    pos2, remap_clamp,
+    pos2, remap, vec2,
 };
 
 pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
@@ -97,8 +97,13 @@ pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
         }
 
         // Only the topmost image gets the hover, so it carries the magnifier for the whole stack.
+        // The images are centered in the available space, so don't magnify the empty margins.
         if let Some(response) = top_response
             && !response.context_menu_opened()
+            && let Some(pointer) = response.hover_pos()
+            && magnifier_layers
+                .iter()
+                .any(|layer| layer.image_rect.contains(pointer))
         {
             magnifier_on_hover(&response, &magnifier_layers);
         }
@@ -181,6 +186,10 @@ fn magnifier_on_hover(response: &Response, layers: &[MagnifierLayer]) {
                 image_rect,
             } in layers
             {
+                if !image_rect.contains(pointer) {
+                    continue;
+                }
+
                 // Load with nearest-neighbor filtering so the texels stay crisp when blown up.
                 let Ok(TexturePoll::Ready { texture }) =
                     ui.ctx()
@@ -189,30 +198,40 @@ fn magnifier_on_hover(response: &Response, layers: &[MagnifierLayer]) {
                     continue;
                 };
 
-                let Vec2 {
-                    x: tex_w,
-                    y: tex_h,
-                } = texture.size;
-                if tex_w <= 0.0 || tex_h <= 0.0 {
+                let tex_size = texture.size;
+                if !(tex_size.x > 0.0 && tex_size.y > 0.0) {
                     continue;
                 }
 
-                // Half the size of the magnified area, in texels:
-                let radius = Vec2::splat(MAGNIFIER_SIZE / MAGNIFIER_ZOOM / 2.0)
-                    .min(Vec2::new(tex_w, tex_h) / 2.0);
-
-                let u = remap_clamp(pointer.x, image_rect.x_range(), 0.0..=tex_w)
-                    .clamp(radius.x, tex_w - radius.x);
-                let v = remap_clamp(pointer.y, image_rect.y_range(), 0.0..=tex_h)
-                    .clamp(radius.y, tex_h - radius.y);
-
-                let uv_rect = Rect::from_min_max(
-                    pos2((u - radius.x) / tex_w, (v - radius.y) / tex_h),
-                    pos2((u + radius.x) / tex_w, (v + radius.y) / tex_h),
+                // The hovered texel, and half the size of the magnified area, in texels:
+                let texel = vec2(
+                    remap(pointer.x, image_rect.x_range(), 0.0..=tex_size.x),
+                    remap(pointer.y, image_rect.y_range(), 0.0..=tex_size.y),
                 );
+                let radius = Vec2::splat(MAGNIFIER_SIZE / MAGNIFIER_ZOOM / 2.0);
+
+                // What we'd like to show, which near an edge reaches outside the image:
+                let min = (texel - radius) / tex_size;
+                let max = (texel + radius) / tex_size;
+                let uv = Rect::from_min_max(pos2(min.x, min.y), pos2(max.x, max.y));
+
+                // Paint only the part that is actually inside the image, so that we
+                // show the edge of the image instead of smearing its outermost texels.
+                let visible_uv = uv.intersect(Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)));
+                if !visible_uv.is_positive() {
+                    continue;
+                }
+                let to_zoom_rect = |pos: Pos2| {
+                    zoom_rect.lerp_inside(vec2(
+                        remap(pos.x, uv.x_range(), 0.0..=1.0),
+                        remap(pos.y, uv.y_range(), 0.0..=1.0),
+                    ))
+                };
+                let visible_rect =
+                    Rect::from_min_max(to_zoom_rect(visible_uv.min), to_zoom_rect(visible_uv.max));
 
                 let mut mesh = Mesh::with_texture(texture.id);
-                mesh.add_rect_with_uv(zoom_rect, uv_rect, *tint);
+                mesh.add_rect_with_uv(visible_rect, visible_uv, *tint);
                 ui.painter().add(Shape::mesh(mesh));
             }
         });
