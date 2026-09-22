@@ -1,7 +1,8 @@
 use crate::state::ViewerAppStateRef;
 use eframe::egui::{
-    Color32, CursorIcon, Image, Mesh, Rect, Response, RichText, Sense, Shape, SizeHint,
+    Align2, Color32, CursorIcon, Image, Mesh, Rect, Response, RichText, Sense, Shape, SizeHint,
     TextureOptions, Ui, Vec2,
+    emath::GuiRounding as _,
     load::{ImagePoll, TexturePoll},
     pos2, remap_clamp,
 };
@@ -68,7 +69,7 @@ pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
         ];
 
         // What the magnifier needs to re-create the blend, in the same order:
-        let mut magnifier_layers: Vec<(String, Color32)> = Vec::new();
+        let mut magnifier_layers: Vec<MagnifierLayer> = Vec::new();
         let mut top_response: Option<Response> = None;
 
         for (image, uri) in layers {
@@ -76,10 +77,21 @@ pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
                 continue;
             };
             let tint = image.image_options().tint;
+            let image_size = image.load_and_calc_size(ui, rect.size());
             let response = ui.place(rect, image.sense(Sense::click()));
             copy_image_context_menu(&response, uri.as_deref());
-            if let Some(uri) = uri {
-                magnifier_layers.push((uri, tint));
+
+            if let Some(uri) = uri
+                && let Some(image_size) = image_size
+            {
+                magnifier_layers.push(MagnifierLayer {
+                    uri,
+                    tint,
+                    // `Ui::place` centers the image within the allocated rect:
+                    image_rect: Align2::CENTER_CENTER
+                        .align_size_within_rect(image_size, response.rect)
+                        .round_ui(),
+                });
             }
             top_response = Some(response);
         }
@@ -137,13 +149,22 @@ const MAGNIFIER_ZOOM: f32 = 16.0;
 /// Width and height of the magnifier window, in points.
 const MAGNIFIER_SIZE: f32 = 256.0;
 
+/// One image of the stack, as the magnifier needs it.
+struct MagnifierLayer {
+    uri: String,
+
+    /// Opacity of this layer in the blend.
+    tint: Color32,
+
+    /// Where the image is painted on screen, in points.
+    image_rect: Rect,
+}
+
 /// Show a zoomed-in, nearest-neighbor view of the images around the pointer.
 ///
-/// `layers` are the image URIs and their tints, in bottom-to-top draw order,
-/// so that the magnifier shows the same blend as the main view.
-fn magnifier_on_hover(response: &Response, layers: &[(String, Color32)]) {
-    let image_rect = response.rect;
-
+/// `layers` are given in bottom-to-top draw order, so that the magnifier shows
+/// the same blend as the main view.
+fn magnifier_on_hover(response: &Response, layers: &[MagnifierLayer]) {
     response
         .clone()
         .on_hover_cursor(CursorIcon::ZoomIn)
@@ -154,7 +175,12 @@ fn magnifier_on_hover(response: &Response, layers: &[(String, Color32)]) {
 
             let (_id, zoom_rect) = ui.allocate_space(Vec2::splat(MAGNIFIER_SIZE));
 
-            for (uri, tint) in layers {
+            for MagnifierLayer {
+                uri,
+                tint,
+                image_rect,
+            } in layers
+            {
                 // Load with nearest-neighbor filtering so the texels stay crisp when blown up.
                 let Ok(TexturePoll::Ready { texture }) =
                     ui.ctx()
