@@ -1,5 +1,5 @@
 use crate::state::ViewerAppStateRef;
-use eframe::egui::{Image, RichText, SizeHint, Ui};
+use eframe::egui::{Image, Response, RichText, Sense, SizeHint, Ui, load::ImagePoll};
 
 pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
     ui.label("Use 1/2/3 to only show old / new / diff at 100% opacity. Arrow keys to navigate.");
@@ -56,17 +56,20 @@ pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
         let any_loading = is_loading(&old) || is_loading(&new) || is_loading(&diff);
 
         if let Some(old) = old {
-            ui.place(rect, old);
+            let response = ui.place(rect, old.sense(Sense::click()));
+            copy_image_context_menu(&response, snapshot.old_uri().as_deref());
         }
 
         if let Some(new) = new {
-            ui.place(rect, new);
+            let response = ui.place(rect, new.sense(Sense::click()));
+            copy_image_context_menu(&response, snapshot.new_uri().as_deref());
         }
 
         if let Some(diff) = diff
             && !diff_failed
         {
-            ui.place(rect, diff);
+            let response = ui.place(rect, diff.sense(Sense::click()));
+            copy_image_context_menu(&response, diff_uri.as_deref());
         }
 
         // Preload surrounding snapshots once our image is loaded
@@ -92,4 +95,19 @@ pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
             }
         }
     }
+}
+
+/// Right-click menu for copying the image at `uri` to the clipboard.
+fn copy_image_context_menu(response: &Response, uri: Option<&str>) {
+    response.context_menu(|ui| {
+        if ui.button("Copy image").clicked() {
+            if let Some(uri) = uri
+                && let Ok(ImagePoll::Ready { image }) =
+                    ui.ctx().try_load_image(uri, SizeHint::default())
+            {
+                ui.ctx().copy_image((*image).clone());
+            }
+            ui.close();
+        }
+    });
 }
