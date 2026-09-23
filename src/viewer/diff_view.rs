@@ -1,14 +1,20 @@
-use crate::state::ViewerAppStateRef;
+use crate::snapshot::Snapshot;
+use crate::state::{ViewerAppStateRef, ViewerSystemCommand};
 use eframe::egui::{
-    Align2, Color32, CursorIcon, Image, Mesh, Pos2, Rect, Response, RichText, Sense, Shape,
-    SizeHint, TextureOptions, Ui, Vec2,
+    Align, Align2, Color32, CursorIcon, Image, Label, Layout, Mesh, Pos2, Rect, Response, RichText,
+    Sense, Shape, SizeHint, TextureOptions, Ui, Vec2,
     emath::GuiRounding as _,
     load::{ImagePoll, TexturePoll},
     pos2, remap, vec2,
 };
+use re_ui::{UiExt as _, icons};
 
 pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
-    ui.label("Use 1/2/3 to only show old / new / diff at 100% opacity. Arrow keys to navigate.");
+    if let Some(snapshot) = state.active_snapshot {
+        snapshot_header(ui, state, snapshot);
+    }
+
+    ui.weak("Use 1/2/3/4 to only show blend / old / new / diff. Arrow keys to navigate.");
 
     if let Some(snapshot) = state.active_snapshot {
         let diff_uri = snapshot.diff_uri(
@@ -79,7 +85,7 @@ pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
             let tint = image.image_options().tint;
             let image_size = image.load_and_calc_size(ui, rect.size());
             let response = ui.place(rect, image.sense(Sense::click()));
-            copy_image_context_menu(&response, uri.as_deref());
+            copy_image_context_menu(&response, snapshot, uri.as_deref());
 
             if let Some(uri) = uri
                 && let Some(image_size) = image_size
@@ -133,8 +139,80 @@ pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
     }
 }
 
-/// Right-click menu for copying the image at `uri` to the clipboard.
-fn copy_image_context_menu(response: &Response, uri: Option<&str>) {
+/// The path and name of the snapshot, with buttons to copy them, and to step between snapshots.
+fn snapshot_header(ui: &mut Ui, state: &ViewerAppStateRef<'_>, snapshot: &Snapshot) {
+    if let Some(dir) = snapshot.path.parent()
+        && !dir.as_os_str().is_empty()
+    {
+        ui.add(
+            Label::new(
+                RichText::new(format!("{}/", dir.display()))
+                    .monospace()
+                    .weak(),
+            )
+            .truncate(),
+        );
+    }
+
+    ui.horizontal(|ui| {
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            let index = state.active_filtered_index;
+            let count = state.filtered_snapshots.len();
+            let select = |filtered_index: usize| {
+                if let Some((index, _)) = state.filtered_snapshots.get(filtered_index) {
+                    state.app.send(ViewerSystemCommand::SelectSnapshot(*index));
+                }
+            };
+
+            if ui
+                .add_enabled(
+                    index + 1 < count,
+                    ui.small_icon_button_widget(&icons::ARROW_DOWN, "Next snapshot"),
+                )
+                .on_hover_text("Next snapshot (↓)")
+                .clicked()
+            {
+                select(index + 1);
+            }
+            ui.label(format!("{} / {count}", index + 1));
+            if ui
+                .add_enabled(
+                    0 < index,
+                    ui.small_icon_button_widget(&icons::ARROW_UP, "Previous snapshot"),
+                )
+                .on_hover_text("Previous snapshot (↑)")
+                .clicked()
+            {
+                select(index.saturating_sub(1));
+            }
+
+            ui.separator();
+
+            let tokens = ui.tokens();
+            if ui
+                .add(icons::COPY.as_button_with_label(tokens, "Path"))
+                .on_hover_text("Copy the path of the snapshot")
+                .clicked()
+            {
+                ui.ctx().copy_text(snapshot.path.display().to_string());
+            }
+            if ui
+                .add(icons::COPY.as_button_with_label(tokens, "Name"))
+                .on_hover_text("Copy the file name of the snapshot")
+                .clicked()
+            {
+                ui.ctx().copy_text(snapshot.file_name().into_owned());
+            }
+
+            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                ui.add(Label::new(RichText::new(snapshot.file_name()).heading()).truncate());
+            });
+        });
+    });
+}
+
+/// Right-click menu for copying the image at `uri`, or the path of the snapshot, to the clipboard.
+fn copy_image_context_menu(response: &Response, snapshot: &Snapshot, uri: Option<&str>) {
     response.context_menu(|ui| {
         if ui.button("Copy image").clicked() {
             if let Some(uri) = uri
@@ -145,6 +223,7 @@ fn copy_image_context_menu(response: &Response, uri: Option<&str>) {
             }
             ui.close();
         }
+        super::copy_snapshot_path_buttons(ui, snapshot);
     });
 }
 

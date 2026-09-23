@@ -2,9 +2,22 @@ mod diff_view;
 mod file_tree;
 mod viewer_options;
 
+use crate::snapshot::Snapshot;
 use crate::state::ViewerAppStateRef;
 use eframe::egui;
 use eframe::egui::Ui;
+
+/// Context menu buttons for copying the file name or path of a snapshot.
+fn copy_snapshot_path_buttons(ui: &mut Ui, snapshot: &Snapshot) {
+    if ui.button("Copy file name").clicked() {
+        ui.ctx().copy_text(snapshot.file_name().into_owned());
+        ui.close();
+    }
+    if ui.button("Copy path").clicked() {
+        ui.ctx().copy_text(snapshot.path.display().to_string());
+        ui.close();
+    }
+}
 
 pub fn viewer_ui(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
     egui::Panel::left("files").show_inside(ui, |ui| {

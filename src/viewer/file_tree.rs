@@ -77,13 +77,21 @@ pub fn file_tree(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
 
             for (prefix, snapshots) in tree {
                 if let Some(prefix) = prefix {
-                    ui.list_item().show_hierarchical_with_children(
-                        ui,
-                        Id::new(prefix),
-                        true,
-                        LabelContent::new(prefix),
-                        |ui| show_prefix(ui, state, &snapshots),
-                    );
+                    ui.list_item()
+                        .show_hierarchical_with_children(
+                            ui,
+                            Id::new(prefix),
+                            true,
+                            LabelContent::new(prefix),
+                            |ui| show_prefix(ui, state, &snapshots),
+                        )
+                        .item_response
+                        .context_menu(|ui| {
+                            if ui.button("Copy path").clicked() {
+                                ui.ctx().copy_text(prefix.to_owned());
+                                ui.close();
+                            }
+                        });
                 } else {
                     show_prefix(ui, state, &snapshots);
                 }
@@ -115,6 +123,8 @@ fn show_prefix(
         if response.clicked() {
             state.app.send(ViewerSystemCommand::SelectSnapshot(*index));
         }
+
+        response.context_menu(|ui| super::copy_snapshot_path_buttons(ui, snapshot));
 
         if selected && state.index_just_selected {
             response.scroll_to_me(None);
