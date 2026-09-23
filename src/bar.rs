@@ -1,5 +1,5 @@
 use crate::github::auth::{GitHubAuth, GithubAuthCommand};
-use crate::state::AppStateRef;
+use crate::state::{AppStateRef, PageRef};
 use eframe::egui;
 use eframe::egui::{Popup, Ui};
 
@@ -9,7 +9,14 @@ pub fn bar(ui: &mut Ui, state: &AppStateRef<'_>) {
         .show_inside(ui, |ui| {
             egui::Sides::new().show(
                 ui,
-                |_ui| {},
+                |ui| {
+                    if let PageRef::DiffViewer(viewer) = &state.page {
+                        ui.strong(viewer.loader.files_header());
+                        if viewer.loader.state().is_pending() {
+                            ui.spinner();
+                        }
+                    }
+                },
                 |ui| {
                     auth_ui(ui, state);
                 },

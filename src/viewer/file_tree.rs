@@ -44,12 +44,6 @@ pub fn file_tree(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
         }
     }
 
-    ui.panel_title_bar_with_buttons(&state.loader.files_header(), None, |ui| {
-        if state.loader.state().is_pending() {
-            ui.spinner();
-        }
-    });
-
     let mut filter = state.filter.clone();
     TextEdit::singleline(&mut filter)
         .hint_text("Filter")
