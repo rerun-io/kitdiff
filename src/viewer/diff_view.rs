@@ -223,7 +223,7 @@ fn copy_image_context_menu(response: &Response, snapshot: &Snapshot, uri: Option
             }
             ui.close();
         }
-        super::copy_snapshot_path_buttons(ui, snapshot);
+        super::copy_path_buttons(ui, &snapshot.path);
     });
 }
 

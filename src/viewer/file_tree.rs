@@ -4,6 +4,7 @@ use eframe::egui::{Id, OpenUrl, ScrollArea, TextEdit, Ui};
 use re_ui::UiExt as _;
 use re_ui::alert::Alert;
 use re_ui::list_item::LabelContent;
+use std::path::Path;
 use std::task::Poll;
 
 fn is_github_permission_error(err: &anyhow::Error) -> bool {
@@ -80,12 +81,7 @@ pub fn file_tree(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
                             |ui| show_prefix(ui, state, &snapshots),
                         )
                         .item_response
-                        .context_menu(|ui| {
-                            if ui.button("Copy path").clicked() {
-                                ui.ctx().copy_text(prefix.to_owned());
-                                ui.close();
-                            }
-                        });
+                        .context_menu(|ui| super::copy_path_buttons(ui, Path::new(prefix)));
                 } else {
                     show_prefix(ui, state, &snapshots);
                 }
@@ -118,7 +114,7 @@ fn show_prefix(
             state.app.send(ViewerSystemCommand::SelectSnapshot(*index));
         }
 
-        response.context_menu(|ui| super::copy_snapshot_path_buttons(ui, snapshot));
+        response.context_menu(|ui| super::copy_path_buttons(ui, &snapshot.path));
 
         if selected && state.index_just_selected {
             response.scroll_to_me(None);
