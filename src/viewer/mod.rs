@@ -5,6 +5,21 @@ mod viewer_options;
 use crate::state::ViewerAppStateRef;
 use eframe::egui;
 use eframe::egui::Ui;
+use std::path::Path;
+
+/// Context menu buttons for copying the name or full path of a file or directory.
+fn copy_path_buttons(ui: &mut Ui, path: &Path) {
+    if let Some(name) = path.file_name()
+        && ui.button("Copy name").clicked()
+    {
+        ui.ctx().copy_text(name.to_string_lossy().into_owned());
+        ui.close();
+    }
+    if ui.button("Copy path").clicked() {
+        ui.ctx().copy_text(path.display().to_string());
+        ui.close();
+    }
+}
 
 pub fn viewer_ui(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
     egui::Panel::left("files").show_inside(ui, |ui| {

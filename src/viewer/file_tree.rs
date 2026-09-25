@@ -4,6 +4,7 @@ use eframe::egui::{Id, OpenUrl, ScrollArea, TextEdit, Ui};
 use re_ui::UiExt as _;
 use re_ui::alert::Alert;
 use re_ui::list_item::LabelContent;
+use std::path::Path;
 use std::task::Poll;
 
 fn is_github_permission_error(err: &anyhow::Error) -> bool {
@@ -44,12 +45,6 @@ pub fn file_tree(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
         }
     }
 
-    ui.panel_title_bar_with_buttons(&state.loader.files_header(), None, |ui| {
-        if state.loader.state().is_pending() {
-            ui.spinner();
-        }
-    });
-
     let mut filter = state.filter.clone();
     TextEdit::singleline(&mut filter)
         .hint_text("Filter")
@@ -77,13 +72,16 @@ pub fn file_tree(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
 
             for (prefix, snapshots) in tree {
                 if let Some(prefix) = prefix {
-                    ui.list_item().show_hierarchical_with_children(
-                        ui,
-                        Id::new(prefix),
-                        true,
-                        LabelContent::new(prefix),
-                        |ui| show_prefix(ui, state, &snapshots),
-                    );
+                    ui.list_item()
+                        .show_hierarchical_with_children(
+                            ui,
+                            Id::new(prefix),
+                            true,
+                            LabelContent::new(prefix),
+                            |ui| show_prefix(ui, state, &snapshots),
+                        )
+                        .item_response
+                        .context_menu(|ui| super::copy_path_buttons(ui, Path::new(prefix)));
                 } else {
                     show_prefix(ui, state, &snapshots);
                 }
@@ -115,6 +113,8 @@ fn show_prefix(
         if response.clicked() {
             state.app.send(ViewerSystemCommand::SelectSnapshot(*index));
         }
+
+        response.context_menu(|ui| super::copy_path_buttons(ui, &snapshot.path));
 
         if selected && state.index_just_selected {
             response.scroll_to_me(None);

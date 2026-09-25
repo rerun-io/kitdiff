@@ -36,18 +36,6 @@ pub fn viewer_options(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
         ui.add(Slider::new(&mut settings.diff_opacity, 0.0..=1.0).text("Diff Opacity"));
     });
 
-    let mut filtered_index = state.active_filtered_index;
-
-    ui.add(
-        Slider::new(&mut filtered_index, 0..=state.filtered_snapshots.len()).text("Snapshot Index"),
-    );
-
-    if filtered_index != state.active_filtered_index
-        && let Some((index, _)) = state.filtered_snapshots.get(filtered_index)
-    {
-        state.app.send(ViewerSystemCommand::SelectSnapshot(*index));
-    }
-
     ui.horizontal_wrapped(|ui| {
         ui.label("Size:");
         ui.selectable_value(&mut settings.mode, ImageMode::Pixel, "1:1");
