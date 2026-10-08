@@ -52,6 +52,7 @@ impl DiffSource {
                 url,
                 state.github_auth.client(),
                 state.github_auth.get_token().is_some(),
+                state.config_override.clone(),
             )),
             Self::GHArtifact(artifact) => {
                 Box::new(loaders::gh_archive_loader::GHArtifactLoader::new(

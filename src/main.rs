@@ -4,6 +4,8 @@ mod cli;
 #[cfg(not(target_arch = "wasm32"))]
 use eframe::NativeOptions;
 use kitdiff::app::App;
+#[cfg(not(target_arch = "wasm32"))]
+use kitdiff::config::Config;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
@@ -23,6 +25,13 @@ fn main() -> eframe::Result<()> {
     use clap::Parser as _;
     let mode = cli::Cli::parse();
 
+    let config_override = mode.config.as_ref().map(|path| {
+        std::fs::read_to_string(path)
+            .map_err(anyhow::Error::from)
+            .and_then(|text| Config::parse(&text))
+            .unwrap_or_else(|err| panic!("Failed to read {}: {err:#}", path.display()))
+    });
+
     let source = mode
         .command
         .unwrap_or(cli::Commands::Files {
@@ -33,7 +42,7 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "kitdiff",
         NativeOptions::default(),
-        Box::new(move |cc| Ok(Box::new(App::new(cc, source)))),
+        Box::new(move |cc| Ok(Box::new(App::new(cc, source, config_override)))),
     )
 }
 
@@ -80,7 +89,7 @@ fn main() {
             .start(
                 canvas,
                 web_options,
-                Box::new(move |cc| Ok(Box::new(App::new(cc, diff_source)))),
+                Box::new(move |cc| Ok(Box::new(App::new(cc, diff_source, None)))),
             )
             .await;
 

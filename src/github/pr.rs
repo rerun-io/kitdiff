@@ -15,8 +15,8 @@ use octocrab::models::{RunId, workflows::WorkflowListArtifact};
 use re_ui::egui_ext::boxed_widget::BoxedWidgetLocalExt as _;
 use re_ui::list_item::{LabelContent, ListItemContentButtonsExt as _, list_item_scope};
 use re_ui::{SectionCollapsingHeader, UiExt as _, icons};
+use std::collections::HashMap;
 use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
 use std::task::Poll;
 pub type GitObjectID = String;
 pub type DateTime = String;
@@ -192,7 +192,9 @@ pub struct ArtifactData {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+/// The combined status of all checks of a commit, as GitHub shows it.
 enum CommitState {
+    NoChecks,
     Pending,
     Success,
     Failure,
@@ -207,13 +209,16 @@ struct CommitData {
 }
 
 impl GithubPr {
-    pub fn new(link: GithubPrLink, client: Octocrab) -> Self {
+    /// `config_override` replaces the `kitdiff.toml` of the repository.
+    pub fn new(link: GithubPrLink, client: Octocrab, config_override: Option<Config>) -> Self {
         let mut inbox = UiInbox::new();
 
         {
             let client = RepoClient::new(client.clone(), link.repo.clone());
             inbox.spawn(|tx| async move {
-                let details = get_pr_commits(&client, link.pr_number).await.map(Box::new);
+                let details = get_pr_commits(&client, link.pr_number, config_override)
+                    .await
+                    .map(Box::new);
                 tx.send(GithubPrCommand::FetchedData(details)).ok();
             });
         }
@@ -317,7 +322,11 @@ impl GithubPr {
     }
 }
 
-async fn get_pr_commits(repo: &RepoClient, pr: PrNumber) -> Result<PrWithCommits> {
+async fn get_pr_commits(
+    repo: &RepoClient,
+    pr: PrNumber,
+    config_override: Option<Config>,
+) -> Result<PrWithCommits> {
     let response: graphql_client::Response<pr_details_query::ResponseData> = repo
         .graphql(&PrDetailsQuery::build_query(pr_details_query::Variables {
             owner: repo.repo().owner.clone(),
@@ -334,7 +343,10 @@ async fn get_pr_commits(repo: &RepoClient, pr: PrNumber) -> Result<PrWithCommits
         .pull_request
         .ok_or_else(|| anyhow!("Pull request not found"))?;
 
-    let config = Config::fetch(repo, &response.head_ref_oid).await;
+    let config = match config_override {
+        Some(config) => Ok(config),
+        None => Config::fetch(repo, &response.head_ref_oid).await,
+    };
     if let Err(err) = &config {
         log::warn!("{err:#}");
     }
@@ -360,68 +372,43 @@ async fn get_pr_commits(repo: &RepoClient, pr: PrNumber) -> Result<PrWithCommits
         let sha = commit.oid;
         let message = commit.message_headline;
 
-        let mut status = CommitState::Success;
-        let mut workflow_run_ids = HashSet::new();
+        let status = match commit.status_check_rollup.map(|rollup| rollup.state) {
+            None => CommitState::NoChecks,
+            Some(pr_details_query::StatusState::SUCCESS) => CommitState::Success,
+            Some(
+                pr_details_query::StatusState::PENDING | pr_details_query::StatusState::EXPECTED,
+            ) => CommitState::Pending,
+            Some(
+                pr_details_query::StatusState::FAILURE
+                | pr_details_query::StatusState::ERROR
+                | pr_details_query::StatusState::Other(_),
+            ) => CommitState::Failure,
+        };
 
-        // Unfortunately github has no easy way to get the status for a commit, best thing seems to be
-        // to query all check suites and group them by workflow.
-        let mut last_suite_per_workflow = HashMap::new();
-
+        // The run of a workflow that ran again replaces the earlier run, so keep the last suite of each workflow.
+        let mut last_run_per_workflow = HashMap::new();
         if let Some(suites) = commit.check_suites
             && let Some(nodes) = suites.nodes
         {
-            for node in nodes.into_iter().flatten() {
-                if let Some(workflow_run) = node.workflow_run.clone() {
-                    last_suite_per_workflow.insert(workflow_run.workflow.id, node);
-                }
-            }
-        }
-
-        #[expect(clippy::iter_over_hash_type)]
-        for suite in last_suite_per_workflow.values() {
-            let pending = match suite.status {
-                pr_details_query::CheckStatusState::IN_PROGRESS
-                | pr_details_query::CheckStatusState::PENDING
-                | pr_details_query::CheckStatusState::QUEUED
-                | pr_details_query::CheckStatusState::REQUESTED
-                | pr_details_query::CheckStatusState::WAITING => true,
-                pr_details_query::CheckStatusState::COMPLETED
-                | pr_details_query::CheckStatusState::Other(_) => false,
-            };
-            let error = if let Some(conclusion) = &suite.conclusion {
-                match conclusion {
-                    pr_details_query::CheckConclusionState::ACTION_REQUIRED
-                    | pr_details_query::CheckConclusionState::CANCELLED
-                    | pr_details_query::CheckConclusionState::FAILURE
-                    | pr_details_query::CheckConclusionState::STARTUP_FAILURE
-                    | pr_details_query::CheckConclusionState::TIMED_OUT
-                    | pr_details_query::CheckConclusionState::Other(_) => true,
-                    pr_details_query::CheckConclusionState::NEUTRAL
-                    | pr_details_query::CheckConclusionState::SKIPPED
-                    | pr_details_query::CheckConclusionState::STALE
-                    | pr_details_query::CheckConclusionState::SUCCESS => false,
-                }
-            } else {
-                false
-            };
-            if error {
-                status = CommitState::Failure;
-            } else if pending && status != CommitState::Failure {
-                status = CommitState::Pending;
-            }
-
-            if let Some(run) = &suite.workflow_run
-                && let Some(db_id) = run.database_id
+            for run in nodes
+                .into_iter()
+                .flatten()
+                .filter_map(|node| node.workflow_run)
             {
-                workflow_run_ids.insert(db_id as u64);
+                last_run_per_workflow.insert(run.workflow.id, run.database_id);
             }
         }
+        let workflow_run_ids = last_run_per_workflow
+            .into_values()
+            .flatten()
+            .map(|id| id as u64)
+            .collect();
 
         data.commits.push(CommitData {
             message,
             sha,
             status,
-            workflow_run_ids: workflow_run_ids.into_iter().collect(),
+            workflow_run_ids,
         });
     }
 
@@ -537,29 +524,38 @@ pub fn pr_ui(ui: &mut egui::Ui, state: &AppStateRef<'_>, pr: &GithubPr) {
     list_item_scope(ui, "pr_info", |ui| match &pr.data {
         Poll::Ready(Ok(data)) => {
             SectionCollapsingHeader::new(format!("PR: {}", data.title)).show(ui, |ui| {
+                if state.config_override.is_some() {
+                    ui.weak("Using the --config file, not the repository's kitdiff.toml");
+                }
                 if let Err(err) = &data.config {
                     ui.colored_label(ui.visuals().error_fg_color, format!("{err:#}"));
                 }
-                ui.set_max_height(100.0);
-                ScrollArea::vertical().show(ui, |ui| {
+                // Not `ui.set_max_height`: after the labels above, it moves the cursor back on top of them.
+                ScrollArea::vertical().max_height(100.0).show(ui, |ui| {
                     for commit in data.commits.iter().rev() {
                         let item = ui.list_item();
 
                         let button = match &commit.status {
-                            CommitState::Failure => icons::ERROR
-                                .as_image()
-                                .tint(ui.tokens().alert_error.icon)
-                                .boxed_local(),
-                            CommitState::Pending => Spinner::new().boxed_local(),
-                            CommitState::Success => icons::SUCCESS
-                                .as_image()
-                                .tint(ui.tokens().alert_success.icon)
-                                .boxed_local(),
+                            CommitState::NoChecks => None,
+                            CommitState::Failure => Some(
+                                icons::ERROR
+                                    .as_image()
+                                    .tint(ui.tokens().alert_error.icon)
+                                    .boxed_local(),
+                            ),
+                            CommitState::Pending => Some(Spinner::new().boxed_local()),
+                            CommitState::Success => Some(
+                                icons::SUCCESS
+                                    .as_image()
+                                    .tint(ui.tokens().alert_success.icon)
+                                    .boxed_local(),
+                            ),
                         };
 
-                        let content = LabelContent::new(&commit.message)
-                            .with_button(button)
-                            .with_always_show_buttons(true);
+                        let mut content = LabelContent::new(&commit.message);
+                        if let Some(button) = button {
+                            content = content.with_button(button).with_always_show_buttons(true);
+                        }
 
                         let response = item.show_hierarchical(ui, content);
                         if response.clicked() {
@@ -597,7 +593,7 @@ pub fn pr_ui(ui: &mut egui::Ui, state: &AppStateRef<'_>, pr: &GithubPr) {
     });
 
     if let Some(source) = selected_source {
-        state.send(SystemCommand::Open(source));
+        state.send(SystemCommand::OpenFromViewer(source));
     }
 }
 

@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::github::model::{GithubPrLink, GithubRepoLink};
 use crate::github::octokit::RepoClient;
 use crate::github::pr::{GithubPr, pr_ui};
@@ -35,10 +36,16 @@ pub struct PrLoader {
     link: GithubPrLink,
     pr_info: GithubPr,
     logged_in: bool,
+    config_override: Option<Config>,
 }
 
 impl PrLoader {
-    pub fn new(link: GithubPrLink, client: Octocrab, logged_in: bool) -> Self {
+    pub fn new(
+        link: GithubPrLink,
+        client: Octocrab,
+        logged_in: bool,
+        config_override: Option<Config>,
+    ) -> Self {
         let mut inbox = UiInbox::new();
         let repo_client = RepoClient::new(client.clone(), link.repo.clone());
 
@@ -58,9 +65,10 @@ impl PrLoader {
             snapshots: Vec::new(),
             inbox,
             state: Poll::Pending,
-            pr_info: GithubPr::new(link.clone(), client),
+            pr_info: GithubPr::new(link.clone(), client, config_override.clone()),
             link,
             logged_in,
+            config_override,
         }
     }
 }
@@ -175,7 +183,12 @@ impl LoadSnapshots for PrLoader {
     }
 
     fn refresh(&mut self, client: Octocrab) {
-        *self = Self::new(self.link.clone(), client, self.logged_in);
+        *self = Self::new(
+            self.link.clone(),
+            client,
+            self.logged_in,
+            self.config_override.clone(),
+        );
     }
 
     fn snapshots(&self) -> &[Snapshot] {

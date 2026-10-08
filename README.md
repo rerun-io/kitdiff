@@ -48,3 +48,9 @@ platforms = ["linux", "macos", "windows"]
 Without a `kitdiff.toml`, kitdiff lists all GitHub Actions artifacts, and shows no "Commit the updated snapshots" button.
 
 Click a commit in the PR panel to see its artifacts.
+
+To try a config before you commit it, pass it with `--config`. It replaces the repository's `kitdiff.toml`:
+
+```sh
+kitdiff --config my-kitdiff.toml pr https://github.com/owner/repo/pull/123
+```
