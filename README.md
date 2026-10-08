@@ -21,7 +21,7 @@ Just do a `cargo install --git https://github.com/rerun-io/kitdiff ` to install 
 
 ## Repository config
 
-When you open a PR, kitdiff reads `kitdiff.toml` from the root of the repository, at the head commit of the PR:
+When you open a PR, kitdiff reads `kitdiff.toml` from the root of the repository, on the PR's base branch.
 
 ```toml
 [github]

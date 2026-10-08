@@ -16,7 +16,6 @@ use re_ui::egui_ext::boxed_widget::BoxedWidgetLocalExt as _;
 use re_ui::list_item::{LabelContent, ListItemContentButtonsExt as _, list_item_scope};
 use re_ui::{SectionCollapsingHeader, UiExt as _, icons};
 use std::collections::HashMap;
-use std::collections::hash_map::Entry;
 use std::task::Poll;
 pub type GitObjectID = String;
 pub type DateTime = String;
@@ -114,7 +113,10 @@ pub struct PrWithCommits {
     /// The archives from [`crate::config::Artifact::url_template`], by commit.
     commit_archives: HashMap<String, Poll<Result<Vec<ArchiveProbe>>>>,
 
-    /// The `kitdiff.toml` at the head of the PR.
+    /// The `kitdiff.toml` of the base branch.
+    ///
+    /// Not of the PR's head: the PR's author must not choose the workflow that the
+    /// "Commit the updated snapshots" button runs with the user's token, or the URLs kitdiff requests.
     config: Result<Config>,
 }
 
@@ -259,19 +261,18 @@ impl GithubPr {
                                     .insert(sha.clone(), Poll::Ready(Err(err)));
                             }
                             Some(Ok(candidates)) => {
-                                pr_data
-                                    .commit_archives
-                                    .entry(sha.clone())
-                                    .or_insert(Poll::Pending);
-                                let sha = sha.clone();
-                                self.inbox.spawn(move |tx| async move {
-                                    let archives = probe_archives(candidates).await;
-                                    tx.send(GithubPrCommand::FetchedCommitArchives {
-                                        sha,
-                                        archives,
-                                    })
-                                    .ok();
-                                });
+                                if should_probe_again(pr_data.commit_archives.get(&sha)) {
+                                    pr_data.commit_archives.insert(sha.clone(), Poll::Pending);
+                                    let sha = sha.clone();
+                                    self.inbox.spawn(move |tx| async move {
+                                        let archives = probe_archives(candidates).await;
+                                        tx.send(GithubPrCommand::FetchedCommitArchives {
+                                            sha,
+                                            archives,
+                                        })
+                                        .ok();
+                                    });
+                                }
                             }
                         }
 
@@ -286,12 +287,14 @@ impl GithubPr {
                             continue;
                         };
 
-                        match pr_data.artifacts.entry(sha.clone()) {
-                            Entry::Occupied(_) => {}
-                            Entry::Vacant(entry) => {
-                                entry.insert(Poll::Pending);
-                            }
+                        // Fetch again only after an error: a finished list is cached.
+                        if matches!(
+                            pr_data.artifacts.get(&sha),
+                            Some(Poll::Pending | Poll::Ready(Ok(_)))
+                        ) {
+                            continue;
                         }
+                        pr_data.artifacts.insert(sha.clone(), Poll::Pending);
 
                         let workflow_run_ids = pr_data
                             .commits
@@ -345,7 +348,7 @@ async fn get_pr_commits(
 
     let config = match config_override {
         Some(config) => Ok(config),
-        None => Config::fetch(repo, &response.head_ref_oid).await,
+        None => Config::fetch(repo, &response.base_ref_name).await,
     };
     if let Err(err) = &config {
         log::warn!("{err:#}");
@@ -433,6 +436,23 @@ enum ArchiveStatus {
     NoChanges,
 
     Error(anyhow::Error),
+}
+
+/// Should a click on a commit check its archives (again)?
+///
+/// Not while a check runs, and not when all archives were found, so that clicks don't repeat requests.
+/// But again when an archive was missing or failed: CI may have published it since.
+fn should_probe_again(cached: Option<&Poll<Result<Vec<ArchiveProbe>>>>) -> bool {
+    match cached {
+        None | Some(Poll::Ready(Err(_))) => true,
+        Some(Poll::Pending) => false,
+        Some(Poll::Ready(Ok(probes))) => probes.iter().any(|probe| {
+            matches!(
+                probe.status,
+                ArchiveStatus::NotPublished | ArchiveStatus::Error(_)
+            )
+        }),
+    }
 }
 
 /// kitdiff downloads archives smaller than this to see if they have any snapshots.

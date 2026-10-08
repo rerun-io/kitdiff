@@ -3,7 +3,6 @@ query PrDetailsQuery($owner: String!, $repo: String!, $oid: Int!) {
         pullRequest(number: $oid) {
             title
             headRefName
-            headRefOid
             baseRefName
 
             commits(last: 100) {
