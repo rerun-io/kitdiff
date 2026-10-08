@@ -254,26 +254,26 @@ impl GithubPr {
                 GithubPrCommand::FetchCommitArtifacts { sha } => {
                     if let Poll::Ready(Ok(pr_data)) = &mut self.data {
                         match pr_data.commit_archive_candidates(&self.link, &sha) {
-                            None => {}
                             Some(Err(err)) => {
                                 pr_data
                                     .commit_archives
                                     .insert(sha.clone(), Poll::Ready(Err(err)));
                             }
-                            Some(Ok(candidates)) => {
-                                if should_probe_again(pr_data.commit_archives.get(&sha)) {
-                                    pr_data.commit_archives.insert(sha.clone(), Poll::Pending);
-                                    let sha = sha.clone();
-                                    self.inbox.spawn(move |tx| async move {
-                                        let archives = probe_archives(candidates).await;
-                                        tx.send(GithubPrCommand::FetchedCommitArchives {
-                                            sha,
-                                            archives,
-                                        })
-                                        .ok();
-                                    });
-                                }
+                            Some(Ok(candidates))
+                                if should_probe_again(pr_data.commit_archives.get(&sha)) =>
+                            {
+                                pr_data.commit_archives.insert(sha.clone(), Poll::Pending);
+                                let sha = sha.clone();
+                                self.inbox.spawn(move |tx| async move {
+                                    let archives = probe_archives(candidates).await;
+                                    tx.send(GithubPrCommand::FetchedCommitArchives {
+                                        sha,
+                                        archives,
+                                    })
+                                    .ok();
+                                });
                             }
+                            None | Some(Ok(_)) => {}
                         }
 
                         // Without a pattern, kitdiff lists no artifacts, so it need not fetch them.
