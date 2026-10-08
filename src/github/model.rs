@@ -1,4 +1,5 @@
-use octocrab::models::{ArtifactId, RunId};
+use crate::github::update_snapshots::UpdateSnapshotsWorkflow;
+use octocrab::models::ArtifactId;
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -91,8 +92,9 @@ pub struct GithubArtifactLink {
     pub repo: GithubRepoLink,
     pub artifact_id: ArtifactId,
     pub name: Option<String>,
-    pub branch_name: Option<String>,
-    pub run_id: Option<RunId>,
+
+    /// Set when the repo's `kitdiff.toml` names a workflow to commit the snapshots.
+    pub update_snapshots: Option<UpdateSnapshotsWorkflow>,
 }
 
 impl GithubArtifactLink {
@@ -102,4 +104,16 @@ impl GithubArtifactLink {
             .unwrap_or(&self.artifact_id.to_string())
             .to_owned()
     }
+}
+
+/// A `.zip` or `.tar.gz` archive with the snapshots of one commit,
+/// from [`crate::config::Artifact::url_template`].
+#[derive(Debug, Clone)]
+pub struct CommitArchiveLink {
+    pub url: String,
+    pub commit: String,
+
+    /// One of [`crate::config::Artifact::platforms`], if the config sets any.
+    pub platform: Option<String>,
+    pub update_snapshots: Option<UpdateSnapshotsWorkflow>,
 }

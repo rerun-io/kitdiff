@@ -36,6 +36,7 @@ env_logger = { version = "0.11.8", default-features = false, features = [
 ] }
 flate2 = { version = "1.1" }
 futures = "0.3.31"
+glob = "0.3.4"
 graphql_client = "0.16.0"
 hello_egui_utils = "0.11.0"
 image = "0.25.8"
@@ -52,6 +53,7 @@ serde = "1.0"
 serde_json = "1.0"
 serde_urlencoded = "0.7.1"
 tar = { version = "0.4.44" }
+toml = "1.1.7"
 zip = { version = "8.5.1", default-features = false, features = ["deflate"] }
 
 # native:
@@ -70,6 +72,18 @@ gix = { version = "0.81", default-features = false, features = [
   "status",
 ] }
 ignore = { version = "0.4" }
+# Native reqwest needs a TLS backend for https (on the web it uses the browser's fetch).
+# We use ring, as octocrab does, and not aws-lc-rs, which is harder to cross-compile (see Cross.toml).
+# `main` installs the ring provider.
+reqwest = { version = "0.13.2", default-features = false, features = [
+  "rustls-no-provider",
+] }
+rustls = { version = "0.23.38", default-features = false, features = [
+  "logging",
+  "ring",
+  "std",
+  "tls12",
+] }
 # To recognize unchanged git-lfs files by their pointer's sha256
 sha2 = "0.10.9"
 tokio = { version = "1.47", features = ["full"] }

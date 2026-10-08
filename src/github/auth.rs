@@ -91,8 +91,7 @@ pub fn parse_github_artifact_url(url: &str) -> Option<GithubArtifactLink> {
             repo: GithubRepoLink { owner, repo },
             artifact_id: ArtifactId(parts[7].parse().ok()?),
             name: None,
-            branch_name: None,
-            run_id: None,
+            update_snapshots: None,
         })
     } else {
         None

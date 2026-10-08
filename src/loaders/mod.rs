@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use std::task::Poll;
 
 pub mod archive_loader;
+pub mod commit_archive_loader;
 pub mod gh_archive_loader;
 pub mod pr_loader;
 

@@ -1,4 +1,3 @@
-use crate::config::Config;
 use crate::diff_image_loader::DiffImageLoader;
 use crate::github::auth::{GitHubAuth, GithubAuthCommand};
 use crate::github::model::GithubPrLink;
@@ -15,7 +14,6 @@ pub struct AppState {
     pub github_auth: GitHubAuth,
     pub github_pr: Option<GithubPr>,
     pub settings: Settings,
-    pub config: Config,
     pub page: Page,
 }
 
@@ -93,12 +91,11 @@ impl View {
 }
 
 impl AppState {
-    pub fn new(settings: Settings, config: Config, sender: UiInboxSender<SystemCommand>) -> Self {
+    pub fn new(settings: Settings, sender: UiInboxSender<SystemCommand>) -> Self {
         Self {
             github_auth: GitHubAuth::new(settings.auth.clone(), sender),
             github_pr: None,
             settings,
-            config,
             page: Page::Home,
         }
     }

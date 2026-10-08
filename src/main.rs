@@ -4,11 +4,15 @@ mod cli;
 #[cfg(not(target_arch = "wasm32"))]
 use eframe::NativeOptions;
 use kitdiff::app::App;
-use kitdiff::config::Config;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
     env_logger::init();
+
+    // reqwest uses rustls without a crypto provider, see Cargo.toml.
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("No other crypto provider should be installed yet");
 
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -29,7 +33,7 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "kitdiff",
         NativeOptions::default(),
-        Box::new(move |cc| Ok(Box::new(App::new(cc, source, Config::default())))),
+        Box::new(move |cc| Ok(Box::new(App::new(cc, source)))),
     )
 }
 
@@ -76,7 +80,7 @@ fn main() {
             .start(
                 canvas,
                 web_options,
-                Box::new(move |cc| Ok(Box::new(App::new(cc, diff_source, Config::default())))),
+                Box::new(move |cc| Ok(Box::new(App::new(cc, diff_source)))),
             )
             .await;
 
