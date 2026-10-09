@@ -11,11 +11,12 @@ query PrDetailsQuery($owner: String!, $repo: String!, $oid: Int!) {
                         oid
                         messageHeadline
                         committedDate
-                        status {
+                        # Combines check runs (e.g. GitHub Actions) and commit statuses (e.g. Buildkite), like the GitHub UI.
+                        statusCheckRollup {
                             state
                         }
 
-                        # Check the latest check suites instead
+                        # Only for the workflow runs, to find their artifacts.
                         checkSuites(last: 100, filterBy: {
                             appId: 15368 # GitHub Actions
                         }) {
@@ -26,12 +27,6 @@ query PrDetailsQuery($owner: String!, $repo: String!, $oid: Int!) {
                                         id
                                     }
                                     databaseId
-                                }
-                                conclusion
-                                status
-                                url
-                                app {
-                                    name
                                 }
                             }
                         }

@@ -15,7 +15,9 @@ pub struct AppState {
     pub github_auth: GitHubAuth,
     pub github_pr: Option<GithubPr>,
     pub settings: Settings,
-    pub config: Config,
+
+    /// From `--config`: used instead of the `kitdiff.toml` of each repository.
+    pub config_override: Option<Config>,
     pub page: Page,
 }
 
@@ -32,6 +34,10 @@ pub struct ViewerState {
     pub index_just_selected: bool,
     pub filter: String,
     pub view: View,
+
+    /// The viewer this one was opened from, e.g. the PR of an artifact.
+    /// The back button returns to it as it was.
+    pub back: Option<Box<Self>>,
 }
 
 impl ViewerState {
@@ -93,12 +99,16 @@ impl View {
 }
 
 impl AppState {
-    pub fn new(settings: Settings, config: Config, sender: UiInboxSender<SystemCommand>) -> Self {
+    pub fn new(
+        settings: Settings,
+        config_override: Option<Config>,
+        sender: UiInboxSender<SystemCommand>,
+    ) -> Self {
         Self {
             github_auth: GitHubAuth::new(settings.auth.clone(), sender),
             github_pr: None,
             settings,
-            config,
+            config_override,
             page: Page::Home,
         }
     }
@@ -212,6 +222,16 @@ impl<'a> Deref for ViewerAppStateRef<'a> {
 
 pub enum SystemCommand {
     Open(crate::DiffSource),
+
+    /// Open a source from the current viewer, e.g. an artifact from a PR.
+    /// The new viewer gets a back button to the current one.
+    OpenFromViewer(crate::DiffSource),
+
+    /// Return to [`ViewerState::back`].
+    Back,
+
+    /// Close the viewer and go to the home page.
+    Close,
     GithubAuth(GithubAuthCommand),
     LoadPrDetails(GithubPrLink),
     UpdateSettings(Settings),
@@ -236,19 +256,35 @@ impl AppState {
         match command {
             SystemCommand::Open(source) => {
                 let loader = source.load(ctx, self);
-                self.page = Page::DiffViewer(ViewerState {
-                    filter: String::new(),
-                    index: 0,
-                    index_just_selected: true,
-                    loader,
-                    view: View::default(),
-                });
+                self.page = Page::DiffViewer(ViewerState::new(loader, None));
+            }
+            SystemCommand::OpenFromViewer(source) => {
+                let loader = source.load(ctx, self);
+                let back = match std::mem::replace(&mut self.page, Page::Home) {
+                    Page::DiffViewer(viewer) => Some(Box::new(viewer)),
+                    Page::Home => None,
+                };
+                self.page = Page::DiffViewer(ViewerState::new(loader, back));
+            }
+            SystemCommand::Close => {
+                self.page = Page::Home;
+            }
+            SystemCommand::Back => {
+                if let Page::DiffViewer(viewer) = &mut self.page
+                    && let Some(back) = viewer.back.take()
+                {
+                    self.page = Page::DiffViewer(*back);
+                }
             }
             SystemCommand::GithubAuth(auth) => {
                 self.github_auth.handle(ctx, auth);
             }
             SystemCommand::LoadPrDetails(url) => {
-                self.github_pr = Some(GithubPr::new(url, self.github_auth.client()));
+                self.github_pr = Some(GithubPr::new(
+                    url,
+                    self.github_auth.client(),
+                    self.config_override.clone(),
+                ));
             }
             SystemCommand::UpdateSettings(settings) => {
                 self.settings = settings;
@@ -282,6 +318,17 @@ impl AppState {
 }
 
 impl ViewerState {
+    fn new(loader: SnapshotLoader, back: Option<Box<Self>>) -> Self {
+        Self {
+            filter: String::new(),
+            index: 0,
+            index_just_selected: true,
+            loader,
+            view: View::default(),
+            back,
+        }
+    }
+
     pub fn handle(&mut self, _ctx: &Context, command: ViewerSystemCommand) {
         match command {
             ViewerSystemCommand::SetFilter(filter) => {

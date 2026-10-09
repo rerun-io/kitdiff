@@ -1,5 +1,5 @@
 use crate::github::auth::parse_github_artifact_url;
-use crate::github::model::{GithubArtifactLink, GithubPrLink};
+use crate::github::model::{CommitArchiveLink, GithubArtifactLink, GithubPrLink};
 pub use crate::loaders::{DataReference, SnapshotLoader};
 use crate::state::AppState;
 use eframe::egui::Context;
@@ -26,6 +26,7 @@ pub enum DiffSource {
     Git(std::path::PathBuf),
     Pr(GithubPrLink),
     GHArtifact(GithubArtifactLink),
+    CommitArchive(CommitArchiveLink),
     Archive(DataReference),
 }
 
@@ -51,6 +52,7 @@ impl DiffSource {
                 url,
                 state.github_auth.client(),
                 state.github_auth.get_token().is_some(),
+                state.config_override.clone(),
             )),
             Self::GHArtifact(artifact) => {
                 Box::new(loaders::gh_archive_loader::GHArtifactLoader::new(
@@ -58,6 +60,9 @@ impl DiffSource {
                     artifact,
                 ))
             }
+            Self::CommitArchive(link) => Box::new(
+                loaders::commit_archive_loader::CommitArchiveLoader::new(link),
+            ),
             Self::Archive(file_ref) => {
                 Box::new(loaders::archive_loader::ArchiveLoader::new(file_ref))
             }

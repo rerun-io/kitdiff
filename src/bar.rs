@@ -1,7 +1,8 @@
 use crate::github::auth::{GitHubAuth, GithubAuthCommand};
-use crate::state::{AppStateRef, PageRef};
+use crate::state::{AppStateRef, PageRef, SystemCommand};
 use eframe::egui;
 use eframe::egui::{Popup, Ui};
+use re_ui::{UiExt as _, icons};
 
 pub fn bar(ui: &mut Ui, state: &AppStateRef<'_>) {
     egui::Panel::top("top bar")
@@ -11,6 +12,21 @@ pub fn bar(ui: &mut Ui, state: &AppStateRef<'_>) {
                 ui,
                 |ui| {
                     if let PageRef::DiffViewer(viewer) = &state.page {
+                        if let Some(back) = &viewer.back {
+                            if ui
+                                .small_icon_button(&icons::ARROW_LEFT, "Back")
+                                .on_hover_text(format!("Back to {}", back.loader.files_header()))
+                                .clicked()
+                            {
+                                state.send(SystemCommand::Back);
+                            }
+                        } else if ui
+                            .small_icon_button(&icons::CLOSE, "Close")
+                            .on_hover_text("Close, and go to the kitdiff home page")
+                            .clicked()
+                        {
+                            state.send(SystemCommand::Close);
+                        }
                         ui.strong(viewer.loader.files_header());
                         if viewer.loader.state().is_pending() {
                             ui.spinner();

@@ -8,6 +8,10 @@ use kitdiff::github::auth::parse_github_artifact_url;
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
+
+    /// Use this `kitdiff.toml` instead of the one in the repository of a PR, e.g. to test changes to it.
+    #[arg(long, global = true)]
+    pub config: Option<std::path::PathBuf>,
 }
 
 #[derive(Subcommand)]

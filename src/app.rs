@@ -1,8 +1,9 @@
+use crate::config::Config;
 use crate::diff_image_loader::DiffImageLoader;
 use crate::settings::Settings;
+use crate::state::View;
 use crate::state::{AppState, AppStateRef, PageRef, SystemCommand, ViewerSystemCommand};
 use crate::{DiffSource, bar, home, viewer};
-use crate::{config::Config, state::View};
 use eframe::egui::{Context, Modifiers, Ui};
 use eframe::{Frame, Storage, egui};
 use egui_extras::install_image_loaders;
@@ -19,7 +20,7 @@ impl App {
     pub fn new(
         cc: &eframe::CreationContext<'_>,
         source: Option<DiffSource>,
-        config: Config,
+        config_override: Option<Config>,
     ) -> Self {
         re_ui::apply_style_and_install_loaders(&cc.egui_ctx);
 
@@ -29,7 +30,7 @@ impl App {
             .unwrap_or_default();
 
         let inbox = UiInbox::new();
-        let state = AppState::new(settings, config, inbox.sender());
+        let state = AppState::new(settings, config_override, inbox.sender());
 
         install_image_loaders(&cc.egui_ctx);
         let diff_loader = Arc::new(DiffImageLoader::default());

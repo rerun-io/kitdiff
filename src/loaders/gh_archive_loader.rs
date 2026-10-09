@@ -1,4 +1,5 @@
 use crate::github::model::GithubArtifactLink;
+use crate::github::update_snapshots::UpdateSnapshotsButton;
 use crate::loaders::LoadSnapshots;
 use crate::loaders::archive_loader::ArchiveLoader;
 use crate::snapshot::Snapshot;
@@ -9,24 +10,12 @@ use eframe::egui::{Context, Ui};
 use egui_inbox::UiInbox;
 use octocrab::Octocrab;
 use octocrab::params::actions::ArchiveFormat;
-use serde_json::json;
 use std::task::Poll;
-
-enum PipelineState {
-    Loading,
-    Triggered { workflow_link: String },
-    Error(anyhow::Error),
-}
-
-enum Event {
-    PipelineState(PipelineState),
-}
 
 pub struct GHArtifactLoader {
     state: LoaderState,
     artifact: GithubArtifactLink,
-    pipeline_state: Option<PipelineState>,
-    inbox: UiInbox<Event>,
+    update_button: Option<UpdateSnapshotsButton>,
 }
 
 #[derive(Debug)]
@@ -47,13 +36,13 @@ impl GHArtifactLoader {
             });
         }
 
-        let inbox = UiInbox::new();
-
         Self {
             state: LoaderState::LoadingData(data_inbox),
+            update_button: artifact
+                .update_snapshots
+                .clone()
+                .map(UpdateSnapshotsButton::new),
             artifact,
-            pipeline_state: None,
-            inbox,
         }
     }
 }
@@ -77,12 +66,8 @@ pub async fn download_artifact(
 
 impl LoadSnapshots for GHArtifactLoader {
     fn update(&mut self, ctx: &Context) {
-        for event in self.inbox.read(ctx) {
-            match event {
-                Event::PipelineState(state) => {
-                    self.pipeline_state = Some(state);
-                }
-            }
+        if let Some(button) = &mut self.update_button {
+            button.update(ctx);
         }
 
         let mut new_state = None;
@@ -134,71 +119,8 @@ impl LoadSnapshots for GHArtifactLoader {
     }
 
     fn extra_ui(&self, ui: &mut Ui, state: &AppStateRef<'_>) {
-        if let Some((git_ref, run_id)) = self.artifact.branch_name.clone().zip(self.artifact.run_id)
-        {
-            let response = ui.button("Commit the updated snapshots").on_hover_text(
-                "This will create a commit on the PR branch with the updated snapshots.",
-            );
-            if response.clicked() {
-                let client = state.github_auth.client();
-                let artifact = self.artifact.clone();
-                let sender = self.inbox.sender();
-                sender
-                    .send(Event::PipelineState(PipelineState::Loading))
-                    .ok();
-                hello_egui_utils::spawn(async move {
-                    let workflow_name = "update_kittest_snapshots.yml";
-                    let result = client
-                        .actions()
-                        .create_workflow_dispatch(
-                            artifact.repo.owner.clone(),
-                            artifact.repo.repo.clone(),
-                            workflow_name,
-                            git_ref.clone(),
-                        )
-                        .inputs(json!({
-                            "run_id": run_id.to_string(),
-                        }))
-                        .send()
-                        .await;
-
-                    let workflow_link = format!(
-                        "https://github.com/{}/{}/actions/workflows/{workflow_name}",
-                        artifact.repo.owner, artifact.repo.repo
-                    );
-
-                    match result {
-                        Ok(()) => {
-                            sender
-                                .send(Event::PipelineState(PipelineState::Triggered {
-                                    workflow_link,
-                                }))
-                                .ok();
-                        }
-                        Err(err) => {
-                            sender
-                                .send(Event::PipelineState(PipelineState::Error(err.into())))
-                                .ok();
-                        }
-                    }
-                });
-            }
-
-            match &self.pipeline_state {
-                Some(PipelineState::Loading) => {
-                    ui.label("Triggering pipeline...");
-                }
-                Some(PipelineState::Triggered { workflow_link }) => {
-                    ui.horizontal(|ui| {
-                        ui.label("Pipeline triggered!");
-                        ui.hyperlink_to("View workflows", workflow_link);
-                    });
-                }
-                Some(PipelineState::Error(err)) => {
-                    ui.colored_label(ui.visuals().error_fg_color, format!("Error: {err}"));
-                }
-                None => {}
-            }
+        if let Some(button) = &self.update_button {
+            button.ui(ui, state);
         }
     }
 
