@@ -33,6 +33,7 @@ impl App {
         let state = AppState::new(settings, config_override, inbox.sender());
 
         install_image_loaders(&cc.egui_ctx);
+        cc.egui_ctx.add_bytes_loader(state.github_files.clone());
         let diff_loader = Arc::new(DiffImageLoader::default());
         cc.egui_ctx.add_image_loader(diff_loader.clone());
 

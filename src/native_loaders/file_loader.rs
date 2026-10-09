@@ -1,4 +1,4 @@
-use crate::loaders::LoadSnapshots;
+use crate::loaders::{LoadSnapshots, sort_snapshots};
 use crate::snapshot::{FileReference, Snapshot};
 use anyhow::Error;
 use eframe::egui::Context;
@@ -63,6 +63,7 @@ impl LoadSnapshots for FileLoader {
         for snapshot in self.inbox.read(ctx) {
             if let Some(snapshot) = snapshot {
                 self.snapshots.push(snapshot);
+                sort_snapshots(&mut self.snapshots);
             } else {
                 self.loading = false;
             }

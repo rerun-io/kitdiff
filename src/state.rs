@@ -4,15 +4,20 @@ use crate::github::auth::{GitHubAuth, GithubAuthCommand};
 use crate::github::model::GithubPrLink;
 use crate::github::pr::GithubPr;
 use crate::loaders::SnapshotLoader;
+use crate::loaders::github_file_loader::GithubFileLoader;
 use crate::settings::Settings;
 use crate::snapshot::Snapshot;
 use eframe::egui::{self, Context};
 use egui_inbox::UiInboxSender;
 use octocrab::Octocrab;
 use std::ops::Deref;
+use std::sync::Arc;
 
 pub struct AppState {
     pub github_auth: GitHubAuth,
+
+    /// Loads the images of PRs. Its client follows `github_auth`.
+    pub github_files: Arc<GithubFileLoader>,
     pub github_pr: Option<GithubPr>,
     pub settings: Settings,
 
@@ -104,8 +109,10 @@ impl AppState {
         config_override: Option<Config>,
         sender: UiInboxSender<SystemCommand>,
     ) -> Self {
+        let github_auth = GitHubAuth::new(settings.auth.clone(), sender);
         Self {
-            github_auth: GitHubAuth::new(settings.auth.clone(), sender),
+            github_files: Arc::new(GithubFileLoader::new(github_auth.client())),
+            github_auth,
             github_pr: None,
             settings,
             config_override,
@@ -278,6 +285,7 @@ impl AppState {
             }
             SystemCommand::GithubAuth(auth) => {
                 self.github_auth.handle(ctx, auth);
+                self.github_files.set_client(self.github_auth.client());
             }
             SystemCommand::LoadPrDetails(url) => {
                 self.github_pr = Some(GithubPr::new(
@@ -297,13 +305,22 @@ impl AppState {
                     log::warn!("Received ViewerCommand but not in DiffViewer page");
                 }
             }
-            SystemCommand::Refresh => match &mut self.page {
-                Page::Home => {}
-                Page::DiffViewer(viewer) => {
-                    let client = self.github_auth.client();
-                    viewer.refresh(client);
+            SystemCommand::Refresh => {
+                // A login also refreshes.
+                self.github_files.set_client(self.github_auth.client());
+
+                // The URIs of PR images don't change, so forget the images that failed to load,
+                // e.g. before the user gave kitdiff access to the repository.
+                ctx.forget_all_images();
+
+                match &mut self.page {
+                    Page::Home => {}
+                    Page::DiffViewer(viewer) => {
+                        let client = self.github_auth.client();
+                        viewer.refresh(client);
+                    }
                 }
-            },
+            }
         }
     }
 

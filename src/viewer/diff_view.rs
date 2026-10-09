@@ -1,8 +1,8 @@
 use crate::snapshot::Snapshot;
 use crate::state::{ViewerAppStateRef, ViewerSystemCommand};
 use eframe::egui::{
-    Align, Align2, Color32, CursorIcon, Image, Label, Layout, Mesh, Pos2, Rect, Response, RichText,
-    Sense, Shape, SizeHint, TextureOptions, Ui, Vec2,
+    Align, Align2, Color32, Context, CursorIcon, Image, Label, Layout, Mesh, Pos2, Rect, Response,
+    RichText, Sense, Shape, SizeHint, TextureOptions, Ui, Vec2,
     emath::GuiRounding as _,
     load::{ImagePoll, TexturePoll},
     pos2, remap, vec2,
@@ -134,6 +134,33 @@ pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
                         ui.ctx().try_load_image(&diff_uri, SizeHint::default()).ok();
                     }
                 }
+            }
+        }
+
+        prefetch_download_urls(ui.ctx(), state);
+    }
+}
+
+/// For PRs in private repositories, each image needs an API call before it can load.
+/// Make these calls far ahead, nearest snapshots first, so that skipping through the snapshots stays fast.
+fn prefetch_download_urls(ctx: &Context, state: &ViewerAppStateRef<'_>) {
+    const AHEAD: usize = 50;
+    const BEHIND: usize = 20;
+
+    let index = state.active_filtered_index;
+    let nearest_first = (1..=AHEAD).flat_map(|distance| {
+        let behind = (distance <= BEHIND)
+            .then(|| index.checked_sub(distance))
+            .flatten();
+        [Some(index + distance), behind]
+    });
+    for i in nearest_first.flatten() {
+        if let Some((_, snapshot)) = state.filtered_snapshots.get(i) {
+            for uri in [snapshot.old_uri(), snapshot.new_uri()]
+                .into_iter()
+                .flatten()
+            {
+                state.app.github_files.prefetch(ctx, &uri);
             }
         }
     }

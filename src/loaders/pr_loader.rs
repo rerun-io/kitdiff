@@ -1,15 +1,16 @@
 use crate::config::Config;
-use crate::github::model::{GithubPrLink, GithubRepoLink};
+use crate::github::model::GithubPrLink;
 use crate::github::octokit::RepoClient;
 use crate::github::pr::{GithubPr, pr_ui};
+use crate::loaders::github_file_loader::github_file_uri;
 use crate::loaders::{LoadSnapshots, sort_snapshots};
 use crate::snapshot::{FileReference, Snapshot};
 use crate::state::AppStateRef;
 use eframe::egui::{Context, Ui};
 use egui_inbox::{UiInbox, UiInboxSender};
-use futures::{StreamExt as _, TryStreamExt as _};
-use octocrab::models::repos::DiffEntryStatus;
-use octocrab::{Octocrab, Result};
+use futures::TryStreamExt as _;
+use octocrab::models::repos::{DiffEntry, DiffEntryStatus};
+use octocrab::{Octocrab, Page, Result};
 use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
 use std::pin::pin;
 use std::task::Poll;
@@ -81,86 +82,47 @@ async fn stream_files(
 ) -> octocrab::Result<()> {
     let pr = repo_client.pulls().get(pr_number).await?;
 
-    let file = repo_client.pulls().list_files(pr_number).await?;
+    // If GitHub doesn't say, assume a private repository when logged in: that works for both.
+    let private = pr
+        .base
+        .repo
+        .as_ref()
+        .and_then(|repo| repo.private)
+        .unwrap_or(logged_in);
 
-    let stream = file.into_stream(&repo_client);
+    // `pulls().list_files()` can't set the page size, and the default of 30 costs three times the API calls.
+    let route = format!(
+        "/repos/{}/{}/pulls/{pr_number}/files",
+        repo_client.repo().owner,
+        repo_client.repo().repo
+    );
+    let first_page: Page<DiffEntry> = repo_client.get(route, Some(&[("per_page", 100)])).await?;
 
-    let results = stream
-        .try_filter_map(|file| async move { Ok(file.filename.ends_with(".png").then_some(file)) })
-        .map_ok(|file| {
-            let repo_client = &repo_client;
-            let pr = &pr;
-            async move {
-                let (old_url, new_url) = futures::join!(
-                    async {
-                        if file.status != DiffEntryStatus::Added {
-                            let name = file.previous_filename.as_deref().unwrap_or(&*file.filename);
-                            resolve_url(repo_client, &pr.base.sha, name, logged_in).await
-                        } else {
-                            None
-                        }
-                    },
-                    async {
-                        if file.status != DiffEntryStatus::Removed {
-                            resolve_url(repo_client, &pr.head.sha, &file.filename, logged_in).await
-                        } else {
-                            None
-                        }
-                    },
-                );
+    let files = first_page
+        .into_stream(&repo_client)
+        .try_filter(|file| std::future::ready(file.filename.ends_with(".png")));
+    let mut files = pin!(files);
 
-                Ok::<_, octocrab::Error>(Snapshot {
-                    path: file.filename.clone().into(),
-                    old: old_url.map(|url| FileReference::Source(url.into())),
-                    new: new_url.map(|url| FileReference::Source(url.into())),
-                    diff: None,
-                })
-            }
-        })
-        .try_buffer_unordered(4);
-    let mut results = pin!(results);
+    let uri = |sha: &str, path: &str| {
+        let encoded_path = utf8_percent_encode(path, PATH_SEGMENT).to_string();
+        FileReference::Source(
+            github_file_uri(repo_client.repo(), sha, &encoded_path, private).into(),
+        )
+    };
 
-    while let Some(snapshot) = results.next().await.transpose()? {
+    while let Some(file) = files.try_next().await? {
+        let old_path = file.previous_filename.as_deref().unwrap_or(&file.filename);
+        let snapshot = Snapshot {
+            path: file.filename.clone().into(),
+            old: (file.status != DiffEntryStatus::Added).then(|| uri(&pr.base.sha, old_path)),
+            new: (file.status != DiffEntryStatus::Removed)
+                .then(|| uri(&pr.head.sha, &file.filename)),
+            diff: None,
+        };
         sender.send(Some(Ok(snapshot))).ok();
     }
 
     Ok(())
-}
-
-/// When logged in, uses the GitHub contents API to get a signed download URL
-/// that works for private repos. Otherwise, falls back to the public
-/// media.githubusercontent.com URL to avoid burning API rate limit.
-async fn resolve_url(
-    repo_client: &RepoClient,
-    commit_sha: &str,
-    file_path: &str,
-    logged_in: bool,
-) -> Option<String> {
-    let encoded_path = utf8_percent_encode(file_path, PATH_SEGMENT).to_string();
-    if logged_in {
-        let content = repo_client
-            .repos()
-            .get_content()
-            .path(&encoded_path)
-            .r#ref(commit_sha)
-            .send()
-            .await
-            .ok()?;
-        content.items.first()?.download_url.clone()
-    } else {
-        Some(create_media_url(
-            repo_client.repo(),
-            commit_sha,
-            &encoded_path,
-        ))
-    }
-}
-
-fn create_media_url(repo: &GithubRepoLink, commit_sha: &str, file_path: &str) -> String {
-    format!(
-        "https://media.githubusercontent.com/media/{}/{}/{}/{}",
-        repo.owner, repo.repo, commit_sha, file_path,
-    )
 }
 
 impl LoadSnapshots for PrLoader {
