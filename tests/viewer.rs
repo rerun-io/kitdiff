@@ -8,13 +8,22 @@ use egui_kittest::kittest::Queryable as _;
 use egui_kittest::{Harness, SnapshotResults};
 use kitdiff::DiffSource;
 use kitdiff::app::App;
+use std::time::Duration;
 
 fn harness(source: Option<DiffSource>) -> Harness<'static, App> {
     let mut harness = Harness::builder()
         .with_size(Vec2::new(1000.0, 600.0))
         .wgpu()
         .build_eframe(|cc| App::new(cc, source, None));
-    harness.run();
+
+    // A loader shows a spinner, which repaints, until its thread is done.
+    for _ in 0..100 {
+        if harness.try_run().is_ok() {
+            return harness;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    harness.run(); // Fails with the reason.
     harness
 }
 
