@@ -96,10 +96,12 @@ where
 
     let reqwest_response = client.execute(request).await?;
 
+    let status = reqwest_response.status();
     let headers = reqwest_response.headers().clone();
 
     let bytes = reqwest_response.bytes().await?;
     let mut response = http::Response::new(BoxBody::new(http_body_util::Full::new(bytes)));
+    *response.status_mut() = status;
     *response.headers_mut() = headers;
 
     Ok(response)
