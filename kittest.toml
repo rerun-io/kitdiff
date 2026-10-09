@@ -1,0 +1,8 @@
+output_path = "tests/snapshots"
+
+# CI runs the snapshot tests on macOS, so macOS is the source of truth.
+# Other OSes get a higher threshold, so that small rendering differences don't fail the tests.
+threshold = 2.0
+
+[mac]
+threshold = 0.6
