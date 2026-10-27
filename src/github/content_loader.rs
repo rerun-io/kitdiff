@@ -1,4 +1,6 @@
 use ahash::HashMap;
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64;
 use eframe::egui::load::{Bytes, BytesLoadResult, BytesLoader, BytesPoll, LoadError};
 use eframe::egui::mutex::Mutex;
 use eframe::egui::{self, Context};
@@ -11,8 +13,9 @@ type Entry = Poll<Result<Arc<[u8]>, String>>;
 
 /// Loads files from GitHub repos through the contents API, with the user's token.
 ///
-/// We don't use the `download_url` of the contents API, because for private repos it holds
+/// We don't store the `download_url` of the contents API, because for private repos it holds
 /// a token that expires after a short time. Images that the user opens later would fail to load.
+/// Instead, we ask the contents API when the image loads.
 ///
 /// URIs look like `github-content://{owner}/{repo}/{sha}/{percent-encoded path}`.
 #[derive(Default)]
@@ -48,10 +51,40 @@ fn api_url(uri: &str) -> Option<String> {
     ))
 }
 
+const LFS_POINTER_PREFIX: &[u8] = b"version https://git-lfs.github.com/spec/v1";
+
+#[derive(serde::Deserialize)]
+struct Content {
+    /// Base64 with line breaks. Empty for files larger than 1 MB.
+    content: String,
+    download_url: Option<String>,
+}
+
 async fn fetch(url: String, token: Option<String>) -> Result<Arc<[u8]>, String> {
+    let content = get(&url, token.as_deref()).await?;
+    let content: Content = serde_json::from_slice(&content).map_err(|err| err.to_string())?;
+
+    let encoded: String = content.content.split_whitespace().collect();
+    let bytes = BASE64
+        .decode(encoded)
+        .map_err(|err| format!("Failed to decode {url}: {err}"))?;
+    if !bytes.is_empty() && !bytes.starts_with(LFS_POINTER_PREFIX) {
+        return Ok(bytes.into());
+    }
+
+    // The file is too large, or is a git-lfs pointer. Then we download it through
+    // `download_url`, which for git-lfs files points to the object on
+    // media.githubusercontent.com. Its token is short-lived, but we only got it now.
+    let download_url = content
+        .download_url
+        .ok_or_else(|| format!("No download_url for {url}"))?;
+    // The token is in the URL, so we don't send our own.
+    Ok(get(&download_url, None).await?.into())
+}
+
+async fn get(url: &str, token: Option<&str>) -> Result<Vec<u8>, String> {
     let mut request = reqwest::Client::new()
-        .get(&url)
-        .header(reqwest::header::ACCEPT, "application/vnd.github.raw")
+        .get(url)
         // The API rejects requests without a User-Agent. Browsers set their own.
         .header(reqwest::header::USER_AGENT, "kitdiff");
     if let Some(token) = token {
@@ -64,7 +97,7 @@ async fn fetch(url: String, token: Option<String>) -> Result<Arc<[u8]>, String> 
         return Err(format!("Failed to load {url}: {status} {text}"));
     }
     let bytes = response.bytes().await.map_err(|err| err.to_string())?;
-    Ok(bytes.to_vec().into())
+    Ok(bytes.to_vec())
 }
 
 impl BytesLoader for GithubContentLoader {
@@ -80,8 +113,8 @@ impl BytesLoader for GithubContentLoader {
         let mut cache = self.cache.lock();
         if let Some(entry) = cache.get(uri) {
             return match entry {
-                // No mime: the contents API answers with `application/vnd.github.raw`,
-                // so the image loader must detect the format from the URI's extension.
+                // No mime: the contents API doesn't tell us the file type, so the
+                // image loader must detect the format itself.
                 Poll::Ready(Ok(bytes)) => Ok(BytesPoll::Ready {
                     size: None,
                     bytes: Bytes::Shared(bytes.clone()),
