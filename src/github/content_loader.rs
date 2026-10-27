@@ -48,12 +48,35 @@ fn api_url(uri: &str) -> Option<String> {
     ))
 }
 
+const LFS_POINTER_PREFIX: &[u8] = b"version https://git-lfs.github.com/spec/v1";
+
 async fn fetch(url: String, token: Option<String>) -> Result<Arc<[u8]>, String> {
+    let bytes = get(&url, token.as_deref(), Some("application/vnd.github.raw")).await?;
+    if !bytes.starts_with(LFS_POINTER_PREFIX) {
+        return Ok(bytes.into());
+    }
+
+    // The raw contents of a git-lfs file are its pointer. The `download_url` of the
+    // contents metadata points to the object on media.githubusercontent.com instead.
+    // We ask for it only now, so its short-lived token is fresh.
+    let metadata = get(&url, token.as_deref(), None).await?;
+    let metadata: serde_json::Value =
+        serde_json::from_slice(&metadata).map_err(|err| err.to_string())?;
+    let download_url = metadata["download_url"]
+        .as_str()
+        .ok_or_else(|| format!("No download_url for git-lfs file {url}"))?;
+    // The token is in the URL, so we don't send our own.
+    Ok(get(download_url, None, None).await?.into())
+}
+
+async fn get(url: &str, token: Option<&str>, accept: Option<&str>) -> Result<Vec<u8>, String> {
     let mut request = reqwest::Client::new()
-        .get(&url)
-        .header(reqwest::header::ACCEPT, "application/vnd.github.raw")
+        .get(url)
         // The API rejects requests without a User-Agent. Browsers set their own.
         .header(reqwest::header::USER_AGENT, "kitdiff");
+    if let Some(accept) = accept {
+        request = request.header(reqwest::header::ACCEPT, accept);
+    }
     if let Some(token) = token {
         request = request.bearer_auth(token);
     }
@@ -64,7 +87,7 @@ async fn fetch(url: String, token: Option<String>) -> Result<Arc<[u8]>, String> 
         return Err(format!("Failed to load {url}: {status} {text}"));
     }
     let bytes = response.bytes().await.map_err(|err| err.to_string())?;
-    Ok(bytes.to_vec().into())
+    Ok(bytes.to_vec())
 }
 
 impl BytesLoader for GithubContentLoader {
