@@ -31,6 +31,21 @@ pub fn viewer_options(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
         }
     });
 
+    ui.add_enabled_ui(state.view == View::Flip, |ui| {
+        ui.add(
+            Slider::new(&mut settings.flip_old_ms, 10..=2000)
+                .logarithmic(true)
+                .suffix(" ms")
+                .text("Flip: Old time"),
+        );
+        ui.add(
+            Slider::new(&mut settings.flip_new_ms, 10..=2000)
+                .logarithmic(true)
+                .suffix(" ms")
+                .text("Flip: New time"),
+        );
+    });
+
     ui.add_enabled_ui(state.view == View::BlendAll, |ui| {
         ui.add(Slider::new(&mut settings.new_opacity, 0.0..=1.0).text("New Opacity"));
         ui.add(Slider::new(&mut settings.diff_opacity, 0.0..=1.0).text("Diff Opacity"));
