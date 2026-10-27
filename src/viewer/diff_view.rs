@@ -1,142 +1,176 @@
 use crate::snapshot::Snapshot;
 use crate::state::{ViewerAppStateRef, ViewerSystemCommand};
 use eframe::egui::{
-    Align, Align2, Color32, CursorIcon, Image, Label, Layout, Mesh, Pos2, Rect, Response, RichText,
-    Sense, Shape, SizeHint, TextureOptions, Ui, Vec2,
+    Align, Align2, Color32, CursorIcon, Frame, Image, Label, Layout, Margin, Mesh, Pos2, Rect,
+    Response, RichText, Sense, Shape, SizeHint, TextureOptions, Ui, Vec2,
     emath::GuiRounding as _,
     load::{ImagePoll, TexturePoll},
     pos2, remap, vec2,
 };
 use re_ui::{UiExt as _, icons};
 
+const KEYS_HINT: &str =
+    "Use 1/2/3/4/5 to only show blend / old / new / diff / flip. Arrow keys to navigate.";
+
 pub fn diff_view(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
-    if let Some(snapshot) = state.active_snapshot {
-        snapshot_header(ui, state, snapshot);
-    }
+    let Some(snapshot) = state.active_snapshot else {
+        ui.weak(KEYS_HINT);
+        return;
+    };
 
-    ui.weak("Use 1/2/3/4 to only show blend / old / new / diff. Arrow keys to navigate.");
+    snapshot_header(ui, state, snapshot);
 
-    if let Some(snapshot) = state.active_snapshot {
-        let diff_uri = snapshot.diff_uri(
-            state.app.settings.use_original_diff,
-            state.app.settings.options,
-        );
+    let diff_uri = snapshot.diff_uri(
+        state.app.settings.use_original_diff,
+        state.app.settings.options,
+    );
 
-        let diff_info = diff_uri
-            .as_deref()
-            .and_then(|uri| state.app.diff_image_loader.diff_info(uri));
+    let diff_info = diff_uri
+        .as_deref()
+        .and_then(|uri| state.app.diff_image_loader.diff_info(uri));
 
-        match &diff_info {
-            Some(Ok(info)) => {
-                if info.diff == 0 {
-                    ui.strong("All differences below threshold!");
-                } else {
-                    ui.label(
-                        RichText::new(format!("Diff pixels: {}", info.diff))
-                            .color(ui.visuals().warn_fg_color),
-                    );
+    let diff_failed = matches!(diff_info, Some(Err(_)));
+
+    let old = snapshot.old_image(state.app);
+    let new = snapshot.new_image(state.app);
+    let diff = if diff_failed {
+        None
+    } else {
+        snapshot.diff_image(state.app)
+    };
+
+    // Bottom-to-top draw order:
+    let layers = [
+        ("Old", old, snapshot.old_uri()),
+        ("New", new, snapshot.new_uri()),
+        ("Diff", diff, diff_uri.clone()),
+    ];
+
+    ui.horizontal(|ui| {
+        ui.weak(KEYS_HINT);
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            for (name, image, _) in layers.iter().rev() {
+                if image.is_some() {
+                    layer_chip(ui, name);
                 }
             }
-            Some(Err(err)) => {
+        });
+    });
+
+    match &diff_info {
+        Some(Ok(info)) => {
+            if info.diff == 0 {
+                ui.strong("All differences below threshold!");
+            } else {
                 ui.label(
-                    RichText::new(format!("Diff failed: {err}")).color(ui.visuals().error_fg_color),
+                    RichText::new(format!("Diff pixels: {}", info.diff))
+                        .color(ui.visuals().warn_fg_color),
                 );
             }
-            None => {
-                ui.label("No diff info yet...");
-            }
         }
+        Some(Err(err)) => {
+            ui.label(
+                RichText::new(format!("Diff failed: {err}")).color(ui.visuals().error_fg_color),
+            );
+        }
+        None => {
+            ui.label("No diff info yet...");
+        }
+    }
 
-        let diff_failed = matches!(diff_info, Some(Err(_)));
+    let rect = ui.available_rect_before_wrap();
 
-        let rect = ui.available_rect_before_wrap();
+    let is_loading = |maybe_image: &Option<Image<'_>>| {
+        maybe_image
+            .as_ref()
+            .map(|img| {
+                img.load_for_size(ui.ctx(), rect.size())
+                    .is_ok_and(|poll| poll.is_pending())
+            })
+            .unwrap_or(false)
+    };
 
-        let old = snapshot.old_image(state.app);
-        let new = snapshot.new_image(state.app);
-        let diff = snapshot.diff_image(state.app);
+    let any_loading = layers.iter().any(|(_, image, _)| is_loading(image));
 
-        let is_loading = |maybe_image: &Option<Image<'_>>| {
-            maybe_image
-                .as_ref()
-                .map(|img| {
-                    img.load_for_size(ui.ctx(), rect.size())
-                        .is_ok_and(|poll| poll.is_pending())
-                })
-                .unwrap_or(false)
+    // What the magnifier needs to re-create the blend, in the same order:
+    let mut magnifier_layers: Vec<MagnifierLayer> = Vec::new();
+    let mut top_response: Option<Response> = None;
+
+    for (_, image, uri) in layers {
+        let Some(image) = image else {
+            continue;
         };
+        let tint = image.image_options().tint;
+        let image_size = image.load_and_calc_size(ui, rect.size());
+        let response = ui.place(rect, image.sense(Sense::click()));
+        copy_image_context_menu(&response, snapshot, uri.as_deref());
 
-        let any_loading = is_loading(&old) || is_loading(&new) || is_loading(&diff);
-
-        // Bottom-to-top draw order:
-        let layers = [
-            (old, snapshot.old_uri()),
-            (new, snapshot.new_uri()),
-            (if diff_failed { None } else { diff }, diff_uri.clone()),
-        ];
-
-        // What the magnifier needs to re-create the blend, in the same order:
-        let mut magnifier_layers: Vec<MagnifierLayer> = Vec::new();
-        let mut top_response: Option<Response> = None;
-
-        for (image, uri) in layers {
-            let Some(image) = image else {
-                continue;
-            };
-            let tint = image.image_options().tint;
-            let image_size = image.load_and_calc_size(ui, rect.size());
-            let response = ui.place(rect, image.sense(Sense::click()));
-            copy_image_context_menu(&response, snapshot, uri.as_deref());
-
-            if let Some(uri) = uri
-                && let Some(image_size) = image_size
-            {
-                magnifier_layers.push(MagnifierLayer {
-                    uri,
-                    tint,
-                    // `Ui::place` centers the image within the allocated rect:
-                    image_rect: Align2::CENTER_CENTER
-                        .align_size_within_rect(image_size, response.rect)
-                        .round_ui(),
-                });
-            }
-            top_response = Some(response);
-        }
-
-        // Only the topmost image gets the hover, so it carries the magnifier for the whole stack.
-        // The images are centered in the available space, so don't magnify the empty margins.
-        if let Some(response) = top_response
-            && !response.context_menu_opened()
-            && let Some(pointer) = response.hover_pos()
-            && magnifier_layers
-                .iter()
-                .any(|layer| layer.image_rect.contains(pointer))
+        if let Some(uri) = uri
+            && let Some(image_size) = image_size
         {
-            magnifier_on_hover(&response, &magnifier_layers);
+            magnifier_layers.push(MagnifierLayer {
+                uri,
+                tint,
+                // `Ui::place` centers the image within the allocated rect:
+                image_rect: Align2::CENTER_CENTER
+                    .align_size_within_rect(image_size, response.rect)
+                    .round_ui(),
+            });
         }
+        top_response = Some(response);
+    }
 
-        // Preload surrounding snapshots once our image is loaded
-        if !any_loading {
-            for i in -10..=10 {
-                if let Some((_, surrounding_snapshot)) = state
-                    .filtered_snapshots
-                    .get((state.active_filtered_index as isize + i) as usize)
-                {
-                    if let Some(old_uri) = surrounding_snapshot.old_uri() {
-                        ui.ctx().try_load_image(&old_uri, SizeHint::default()).ok();
-                    }
-                    if let Some(new_uri) = surrounding_snapshot.new_uri() {
-                        ui.ctx().try_load_image(&new_uri, SizeHint::default()).ok();
-                    }
-                    if let Some(diff_uri) = surrounding_snapshot.diff_uri(
-                        state.app.settings.use_original_diff,
-                        state.app.settings.options,
-                    ) {
-                        ui.ctx().try_load_image(&diff_uri, SizeHint::default()).ok();
-                    }
+    // Only the topmost image gets the hover, so it carries the magnifier for the whole stack.
+    // The images are centered in the available space, so don't magnify the empty margins.
+    if let Some(response) = top_response
+        && !response.context_menu_opened()
+        && let Some(pointer) = response.hover_pos()
+        && magnifier_layers
+            .iter()
+            .any(|layer| layer.image_rect.contains(pointer))
+    {
+        magnifier_on_hover(&response, &magnifier_layers);
+    }
+
+    // Preload surrounding snapshots once our image is loaded
+    if !any_loading {
+        for i in -10..=10 {
+            if let Some((_, surrounding_snapshot)) = state
+                .filtered_snapshots
+                .get((state.active_filtered_index as isize + i) as usize)
+            {
+                if let Some(old_uri) = surrounding_snapshot.old_uri() {
+                    ui.ctx().try_load_image(&old_uri, SizeHint::default()).ok();
+                }
+                if let Some(new_uri) = surrounding_snapshot.new_uri() {
+                    ui.ctx().try_load_image(&new_uri, SizeHint::default()).ok();
+                }
+                if let Some(diff_uri) = surrounding_snapshot.diff_uri(
+                    state.app.settings.use_original_diff,
+                    state.app.settings.options,
+                ) {
+                    ui.ctx().try_load_image(&diff_uri, SizeHint::default()).ok();
                 }
             }
         }
     }
+}
+
+/// A colored chip that names a shown layer, so that it is easy to see which layers are shown,
+/// e.g. while [`crate::state::View::Flip`] flips.
+fn layer_chip(ui: &mut Ui, name: &str) {
+    let fill = match name {
+        "Old" => Color32::from_rgb(220, 70, 70),
+        "New" => Color32::from_rgb(60, 170, 80),
+        _ => Color32::from_rgb(230, 180, 40),
+    };
+    Frame::new()
+        .fill(fill)
+        .corner_radius(4)
+        .inner_margin(Margin::symmetric(6, 1))
+        .show(ui, |ui| {
+            ui.label(RichText::new(name).color(Color32::BLACK));
+        });
 }
 
 /// The path and name of the snapshot, with buttons to copy them, and to step between snapshots.

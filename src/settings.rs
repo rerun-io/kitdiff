@@ -23,6 +23,18 @@ pub struct Settings {
     pub options: DiffOptions,
     #[serde(default)]
     pub auth: AuthState,
+
+    /// How long [`crate::state::View::Flip`] shows the old image.
+    #[serde(default = "default_flip_ms")]
+    pub flip_old_ms: u32,
+
+    /// How long [`crate::state::View::Flip`] shows the new image.
+    #[serde(default = "default_flip_ms")]
+    pub flip_new_ms: u32,
+}
+
+fn default_flip_ms() -> u32 {
+    200
 }
 
 impl Default for Settings {
@@ -35,6 +47,8 @@ impl Default for Settings {
             use_original_diff: true,
             options: DiffOptions::default(),
             auth: Default::default(),
+            flip_old_ms: default_flip_ms(),
+            flip_new_ms: default_flip_ms(),
         }
     }
 }

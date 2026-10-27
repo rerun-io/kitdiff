@@ -113,12 +113,32 @@ impl Snapshot {
         image
     }
 
+    /// The view to show now. Resolves [`View::Flip`] to [`View::Old`] or [`View::New`] by the time.
+    fn shown_view(state: &AppStateRef<'_>, view: View) -> View {
+        if view != View::Flip {
+            return view;
+        }
+        let old = f64::from(state.settings.flip_old_ms.max(1)) / 1000.0;
+        let new = f64::from(state.settings.flip_new_ms.max(1)) / 1000.0;
+        let phase = state.egui_ctx.input(|i| i.time) % (old + new);
+        let (view, remaining) = if phase < old {
+            (View::Old, old - phase)
+        } else {
+            (View::New, old + new - phase)
+        };
+        state
+            .egui_ctx
+            .request_repaint_after(std::time::Duration::from_secs_f64(remaining));
+        view
+    }
+
     pub fn old_image<'a>(&self, state: &AppStateRef<'a>) -> Option<eframe::egui::Image<'a>> {
         let PageRef::DiffViewer(vs) = &state.page else {
             return None;
         };
-        let blend_all = vs.view == View::BlendAll;
-        let show_old = vs.view == View::Old;
+        let view = Self::shown_view(state, vs.view);
+        let blend_all = view == View::BlendAll;
+        let show_old = view == View::Old;
         (blend_all || show_old)
             .then(|| self.old_uri())
             .flatten()
@@ -129,8 +149,9 @@ impl Snapshot {
         let PageRef::DiffViewer(vs) = &state.page else {
             return None;
         };
-        let blend_all = vs.view == View::BlendAll;
-        let show_new = vs.view == View::New;
+        let view = Self::shown_view(state, vs.view);
+        let blend_all = view == View::BlendAll;
+        let show_new = view == View::New;
         (blend_all || show_new)
             .then(|| self.new_uri())
             .flatten()

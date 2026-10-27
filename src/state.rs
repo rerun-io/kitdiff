@@ -72,6 +72,9 @@ pub enum View {
 
     /// View diff
     Diff,
+
+    /// Flip between old and new, with the times from the settings.
+    Flip,
 }
 
 impl std::fmt::Display for View {
@@ -81,12 +84,13 @@ impl std::fmt::Display for View {
             Self::Old => write!(f, "Old"),
             Self::New => write!(f, "New"),
             Self::Diff => write!(f, "Diff"),
+            Self::Flip => write!(f, "Flip"),
         }
     }
 }
 
 impl View {
-    pub const ALL: [Self; 4] = [Self::BlendAll, Self::Old, Self::New, Self::Diff];
+    pub const ALL: [Self; 5] = [Self::BlendAll, Self::Old, Self::New, Self::Diff, Self::Flip];
 
     pub fn key(self) -> egui::Key {
         match self {
@@ -94,6 +98,7 @@ impl View {
             Self::Old => egui::Key::Num2,
             Self::New => egui::Key::Num3,
             Self::Diff => egui::Key::Num4,
+            Self::Flip => egui::Key::Num5,
         }
     }
 }
