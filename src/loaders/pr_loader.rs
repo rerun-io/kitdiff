@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::github::content_loader::GithubContentLoader;
 use crate::github::model::{GithubPrLink, GithubRepoLink};
 use crate::github::octokit::RepoClient;
 use crate::github::pr::{GithubPr, pr_ui};
@@ -7,7 +8,7 @@ use crate::snapshot::{FileReference, Snapshot};
 use crate::state::AppStateRef;
 use eframe::egui::{Context, Ui};
 use egui_inbox::{UiInbox, UiInboxSender};
-use futures::{StreamExt as _, TryStreamExt as _};
+use futures::TryStreamExt as _;
 use octocrab::models::repos::DiffEntryStatus;
 use octocrab::{Octocrab, Result};
 use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
@@ -85,74 +86,48 @@ async fn stream_files(
 
     let stream = file.into_stream(&repo_client);
 
-    let results = stream
-        .try_filter_map(|file| async move { Ok(file.filename.ends_with(".png").then_some(file)) })
-        .map_ok(|file| {
-            let repo_client = &repo_client;
-            let pr = &pr;
-            async move {
-                let (old_url, new_url) = futures::join!(
-                    async {
-                        if file.status != DiffEntryStatus::Added {
-                            let name = file.previous_filename.as_deref().unwrap_or(&*file.filename);
-                            resolve_url(repo_client, &pr.base.sha, name, logged_in).await
-                        } else {
-                            None
-                        }
-                    },
-                    async {
-                        if file.status != DiffEntryStatus::Removed {
-                            resolve_url(repo_client, &pr.head.sha, &file.filename, logged_in).await
-                        } else {
-                            None
-                        }
-                    },
-                );
-
-                Ok::<_, octocrab::Error>(Snapshot {
-                    path: file.filename.clone().into(),
-                    old: old_url.map(|url| FileReference::Source(url.into())),
-                    new: new_url.map(|url| FileReference::Source(url.into())),
-                    diff: None,
-                })
-            }
-        })
-        .try_buffer_unordered(4);
+    let repo = repo_client.repo();
+    let pr = &pr;
+    let results = stream.try_filter_map(|file| async move {
+        if !file.filename.ends_with(".png") {
+            return Ok(None);
+        }
+        let old = (file.status != DiffEntryStatus::Added).then(|| {
+            let name = file.previous_filename.as_deref().unwrap_or(&*file.filename);
+            resolve_url(repo, &pr.base.sha, name, logged_in)
+        });
+        let new = (file.status != DiffEntryStatus::Removed)
+            .then(|| resolve_url(repo, &pr.head.sha, &file.filename, logged_in));
+        Ok(Some(Snapshot {
+            path: file.filename.clone().into(),
+            old: old.map(|url| FileReference::Source(url.into())),
+            new: new.map(|url| FileReference::Source(url.into())),
+            diff: None,
+        }))
+    });
     let mut results = pin!(results);
 
-    while let Some(snapshot) = results.next().await.transpose()? {
+    while let Some(snapshot) = results.try_next().await? {
         sender.send(Some(Ok(snapshot))).ok();
     }
 
     Ok(())
 }
 
-/// When logged in, uses the GitHub contents API to get a signed download URL
-/// that works for private repos. Otherwise, falls back to the public
-/// media.githubusercontent.com URL to avoid burning API rate limit.
-async fn resolve_url(
-    repo_client: &RepoClient,
+/// When logged in, loads the file through the contents API with
+/// [`GithubContentLoader`], which works for private repos. Otherwise, uses the
+/// public media.githubusercontent.com URL to avoid burning API rate limit.
+fn resolve_url(
+    repo: &GithubRepoLink,
     commit_sha: &str,
     file_path: &str,
     logged_in: bool,
-) -> Option<String> {
+) -> String {
     let encoded_path = utf8_percent_encode(file_path, PATH_SEGMENT).to_string();
     if logged_in {
-        let content = repo_client
-            .repos()
-            .get_content()
-            .path(&encoded_path)
-            .r#ref(commit_sha)
-            .send()
-            .await
-            .ok()?;
-        content.items.first()?.download_url.clone()
+        GithubContentLoader::uri(&repo.owner, &repo.repo, commit_sha, &encoded_path)
     } else {
-        Some(create_media_url(
-            repo_client.repo(),
-            commit_sha,
-            &encoded_path,
-        ))
+        create_media_url(repo, commit_sha, &encoded_path)
     }
 }
 

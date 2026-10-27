@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::diff_image_loader::DiffImageLoader;
+use crate::github::content_loader::GithubContentLoader;
 use crate::settings::Settings;
 use crate::state::View;
 use crate::state::{AppState, AppStateRef, PageRef, SystemCommand, ViewerSystemCommand};
@@ -12,6 +13,7 @@ use std::sync::Arc;
 
 pub struct App {
     diff_loader: Arc<DiffImageLoader>,
+    content_loader: Arc<GithubContentLoader>,
     state: AppState,
     inbox: UiInbox<SystemCommand>,
 }
@@ -35,6 +37,9 @@ impl App {
         install_image_loaders(&cc.egui_ctx);
         let diff_loader = Arc::new(DiffImageLoader::default());
         cc.egui_ctx.add_image_loader(diff_loader.clone());
+        let content_loader = Arc::new(GithubContentLoader::default());
+        content_loader.set_token(state.github_auth.get_token());
+        cc.egui_ctx.add_bytes_loader(content_loader.clone());
 
         if let Some(source) = source {
             inbox.sender().send(SystemCommand::Open(source)).ok();
@@ -42,6 +47,7 @@ impl App {
 
         Self {
             diff_loader,
+            content_loader,
             state,
             inbox,
         }
@@ -56,6 +62,8 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut Frame) {
         let ctx = ui.ctx().clone();
         self.state.update(&ctx);
+        self.content_loader
+            .set_token(self.state.github_auth.get_token());
         self.inbox.read(&ctx).for_each(|cmd| {
             self.state.handle(&ctx, cmd);
         });
