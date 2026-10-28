@@ -61,7 +61,7 @@ struct Content {
 }
 
 async fn fetch(url: String, token: Option<String>) -> Result<Arc<[u8]>, String> {
-    let content = get(&url, token.as_deref()).await?;
+    let content = get(&url, Some("application/vnd.github+json"), token.as_deref()).await?;
     let content: Content = serde_json::from_slice(&content).map_err(|err| err.to_string())?;
 
     let encoded: String = content.content.split_whitespace().collect();
@@ -79,14 +79,25 @@ async fn fetch(url: String, token: Option<String>) -> Result<Arc<[u8]>, String> 
         .download_url
         .ok_or_else(|| format!("No download_url for {url}"))?;
     // The token is in the URL, so we don't send our own.
-    Ok(get(&download_url, None).await?.into())
+    Ok(get(&download_url, None, None).await?.into())
 }
 
-async fn get(url: &str, token: Option<&str>) -> Result<Vec<u8>, String> {
+async fn get(url: &str, accept: Option<&str>, token: Option<&str>) -> Result<Vec<u8>, String> {
     let mut request = reqwest::Client::new()
         .get(url)
         // The API rejects requests without a User-Agent. Browsers set their own.
         .header(reqwest::header::USER_AGENT, "kitdiff");
+    // GitHub sends the same ETag for the raw and the JSON response of the contents API.
+    // So the browser may answer a JSON request with a cached raw response (e.g. from an
+    // older kitdiff version that requested raw), after revalidating it with a 304.
+    // The loader caches the files itself, so we skip the browser cache.
+    #[cfg(target_arch = "wasm32")]
+    {
+        request = request.fetch_cache_no_store();
+    }
+    if let Some(accept) = accept {
+        request = request.header(reqwest::header::ACCEPT, accept);
+    }
     if let Some(token) = token {
         request = request.bearer_auth(token);
     }
