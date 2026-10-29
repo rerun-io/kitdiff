@@ -36,7 +36,7 @@ impl LoadSnapshots for CommitArchiveLoader {
         }
     }
 
-    fn refresh(&mut self, _client: Octocrab) {
+    fn refresh(&mut self, _client: Octocrab, _logged_in: bool) {
         self.archive = ArchiveLoader::new(DataReference::Url(self.link.url.clone()));
     }
 

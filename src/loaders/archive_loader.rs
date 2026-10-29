@@ -84,7 +84,7 @@ impl LoadSnapshots for ArchiveLoader {
         }
     }
 
-    fn refresh(&mut self, _client: octocrab::Octocrab) {
+    fn refresh(&mut self, _client: octocrab::Octocrab, _logged_in: bool) {
         *self = Self::new(self.reference.clone());
     }
 }

@@ -69,7 +69,7 @@ impl LoadSnapshots for FileLoader {
         }
     }
 
-    fn refresh(&mut self, _client: Octocrab) {
+    fn refresh(&mut self, _client: Octocrab, _logged_in: bool) {
         *self = Self::new(self.base_path.clone());
     }
 

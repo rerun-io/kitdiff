@@ -1,3 +1,4 @@
+use crate::github::auth::GithubAuthCommand;
 use crate::state::{FilteredSnapshot, ViewerAppStateRef, ViewerSystemCommand};
 use eframe::egui;
 use eframe::egui::{Id, OpenUrl, ScrollArea, TextEdit, Ui};
@@ -9,7 +10,13 @@ use std::task::Poll;
 
 fn is_github_permission_error(err: &anyhow::Error) -> bool {
     for cause in err.chain() {
-        if let Some(github_err) = cause.downcast_ref::<octocrab::GitHubError>() {
+        // octocrab boxes the GitHubError, and gives the box as the source.
+        let github_err = cause.downcast_ref::<octocrab::GitHubError>().or_else(|| {
+            cause
+                .downcast_ref::<Box<octocrab::GitHubError>>()
+                .map(|err| &**err)
+        });
+        if let Some(github_err) = github_err {
             return matches!(
                 github_err.status_code,
                 reqwest::StatusCode::FORBIDDEN | reqwest::StatusCode::NOT_FOUND
@@ -28,13 +35,21 @@ pub fn file_tree(ui: &mut Ui, state: &ViewerAppStateRef<'_>) {
 
     if let Poll::Ready(Err(e)) = state.loader.state() {
         if is_github_permission_error(e) {
+            let logged_in = state.app.github_auth.get_token().is_some();
             Alert::warning().show(ui, |ui: &mut Ui| {
                 ui.vertical(|ui| {
-                    ui.label("kitdiff does not have access to this repository.");
-                    if ui.link("Grant repository access").clicked() {
-                        ui.ctx().open_url(OpenUrl::new_tab(
-                            crate::github::auth::GitHubAuth::MANAGE_REPO_ACCESS_URL,
-                        ));
+                    if logged_in {
+                        ui.label("kitdiff does not have access to this repository.");
+                        if ui.link("Grant repository access").clicked() {
+                            ui.ctx().open_url(OpenUrl::new_tab(
+                                crate::github::auth::GitHubAuth::MANAGE_REPO_ACCESS_URL,
+                            ));
+                        }
+                    } else {
+                        ui.label("This repository may be private.");
+                        if ui.link("Log in with GitHub").clicked() {
+                            state.app.send(GithubAuthCommand::Login);
+                        }
                     }
                 });
             });

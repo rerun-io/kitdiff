@@ -13,7 +13,8 @@ pub mod pr_loader;
 pub trait LoadSnapshots {
     fn update(&mut self, ctx: &egui::Context);
 
-    fn refresh(&mut self, client: Octocrab);
+    /// Reloads the snapshots, e.g. after the user logged in.
+    fn refresh(&mut self, client: Octocrab, logged_in: bool);
 
     fn snapshots(&self) -> &[Snapshot];
 
