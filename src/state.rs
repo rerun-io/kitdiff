@@ -306,7 +306,8 @@ impl AppState {
                 Page::Home => {}
                 Page::DiffViewer(viewer) => {
                     let client = self.github_auth.client();
-                    viewer.refresh(client);
+                    let logged_in = self.github_auth.get_token().is_some();
+                    viewer.refresh(client, logged_in);
                 }
             },
         }
@@ -352,8 +353,8 @@ impl ViewerState {
         }
     }
 
-    pub fn refresh(&mut self, client: Octocrab) {
-        self.loader.refresh(client);
+    pub fn refresh(&mut self, client: Octocrab, logged_in: bool) {
+        self.loader.refresh(client, logged_in);
         self.index = 0;
     }
 }

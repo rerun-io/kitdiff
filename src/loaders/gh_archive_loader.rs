@@ -124,7 +124,7 @@ impl LoadSnapshots for GHArtifactLoader {
         }
     }
 
-    fn refresh(&mut self, client: Octocrab) {
+    fn refresh(&mut self, client: Octocrab, _logged_in: bool) {
         *self = Self::new(client, self.artifact.clone());
     }
 }

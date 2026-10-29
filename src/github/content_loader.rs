@@ -83,10 +83,13 @@ async fn fetch(url: String, token: Option<String>) -> Result<Arc<[u8]>, String> 
 }
 
 async fn get(url: &str, accept: Option<&str>, token: Option<&str>) -> Result<Vec<u8>, String> {
-    let mut request = reqwest::Client::new()
-        .get(url)
-        // The API rejects requests without a User-Agent. Browsers set their own.
-        .header(reqwest::header::USER_AGENT, "kitdiff");
+    let mut request = reqwest::Client::new().get(url);
+    // The API rejects requests without a User-Agent. Browsers set their own, and
+    // Firefox would send ours, which media.githubusercontent.com's CORS preflight rejects.
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        request = request.header(reqwest::header::USER_AGENT, "kitdiff");
+    }
     // GitHub sends the same ETag for the raw and the JSON response of the contents API.
     // So the browser may answer a JSON request with a cached raw response (e.g. from an
     // older kitdiff version that requested raw), after revalidating it with a 304.

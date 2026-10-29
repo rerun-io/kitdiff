@@ -36,7 +36,6 @@ pub struct PrLoader {
     state: Poll<anyhow::Result<()>>,
     link: GithubPrLink,
     pr_info: GithubPr,
-    logged_in: bool,
     config_override: Option<Config>,
 }
 
@@ -68,7 +67,6 @@ impl PrLoader {
             state: Poll::Pending,
             pr_info: GithubPr::new(link.clone(), client, config_override.clone()),
             link,
-            logged_in,
             config_override,
         }
     }
@@ -157,11 +155,11 @@ impl LoadSnapshots for PrLoader {
         self.pr_info.update(ctx);
     }
 
-    fn refresh(&mut self, client: Octocrab) {
+    fn refresh(&mut self, client: Octocrab, logged_in: bool) {
         *self = Self::new(
             self.link.clone(),
             client,
-            self.logged_in,
+            logged_in,
             self.config_override.clone(),
         );
     }
